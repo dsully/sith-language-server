@@ -24,7 +24,7 @@ pub enum Mod {
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModModule {
     pub range: TextRange,
     pub body: Vec<Stmt>,
