@@ -84,8 +84,16 @@ impl ImplicitImports {
                 let Some(name) = path.file_name().and_then(OsStr::to_str) else {
                     continue;
                 };
+                let Some(parent) = path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(OsStr::to_str)
+                else {
+                    continue;
+                };
+
                 submodules.insert(
-                    name.to_string(),
+                    format!("{parent}/{name}"),
                     ImplicitImport {
                         is_stub_file,
                         is_native_lib: false,
