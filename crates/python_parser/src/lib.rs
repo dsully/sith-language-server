@@ -103,7 +103,7 @@ mod token_source;
 /// "#;
 ///
 /// let module = parse_module(source);
-/// assert!(module.is_ok());
+/// assert!(module.is_valid());
 /// ```
 pub fn parse_module(source: &str) -> Parsed<ModModule> {
     Parser::new(source, Mode::Module)
@@ -231,7 +231,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Parsed<T> {
     syntax: T,
     errors: Vec<ParseError>,

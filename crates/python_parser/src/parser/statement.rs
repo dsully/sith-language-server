@@ -681,7 +681,15 @@ impl<'src> Parser<'src> {
             // import a..b
             // import a...b
             dotted_name.push('.');
-            dotted_name.push_str(&self.parse_identifier());
+            if self.current_token_kind().is_identifier() {
+                dotted_name.push_str(&self.parse_identifier());
+            } else {
+                self.add_error(
+                    ParseErrorType::OtherError("Expected an identifier".into()),
+                    // add one to the end of the range so we don't have an empty range.
+                    self.missing_node_range().add_end(1.into()),
+                );
+            }
         }
 
         // test_ok dotted_name_normalized_spaces

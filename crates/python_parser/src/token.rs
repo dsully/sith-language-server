@@ -319,6 +319,12 @@ impl TokenKind {
         TokenKind::And <= self && self <= TokenKind::Yield
     }
 
+    /// Returns `true` if the token is an identifier ([`TokenKind::Name`] token).
+    #[inline]
+    pub fn is_identifier(&self) -> bool {
+        matches!(self, TokenKind::Name) || self.is_soft_keyword()
+    }
+
     #[inline]
     pub const fn is_operator(self) -> bool {
         matches!(
