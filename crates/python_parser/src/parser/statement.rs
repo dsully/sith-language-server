@@ -7,7 +7,7 @@ use python_ast::name::Name;
 use python_ast::{
     self as ast, ContextExpr, ExceptHandler, Expr, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
@@ -1800,8 +1800,12 @@ impl<'src> Parser<'src> {
         // def foo() -> int:
         // x = 42
         let body = self.parse_body(Clause::FunctionDef);
-
         ast::FunctionDefStmt {
+            range: if body.is_empty() {
+                TextRange::new(start, self.current_token_range().end())
+            } else {
+                self.node_range(start)
+            },
             name,
             type_params: type_params.map(Box::new),
             parameters: Box::new(parameters),
@@ -1809,7 +1813,6 @@ impl<'src> Parser<'src> {
             decorator_list,
             is_async: false,
             returns,
-            range: self.node_range(start),
         }
     }
 
@@ -1858,7 +1861,11 @@ impl<'src> Parser<'src> {
         let body = self.parse_body(Clause::Class);
 
         ast::ClassDefStmt {
-            range: self.node_range(start),
+            range: if body.is_empty() {
+                TextRange::new(start, self.current_token_range().end())
+            } else {
+                self.node_range(start)
+            },
             decorator_list,
             name,
             type_params: type_params.map(Box::new),
@@ -2569,8 +2576,6 @@ impl<'src> Parser<'src> {
     fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
-
-        let newline_range = self.current_token_range();
         if self.eat(TokenKind::Newline) {
             if self.at(TokenKind::Indent) {
                 return self.parse_block();
@@ -2586,11 +2591,7 @@ impl<'src> Parser<'src> {
                 ParseErrorType::OtherError(format!(
                     "Expected an indented block after {parent_clause}"
                 )),
-                if self.current_token_range().is_empty() {
-                    newline_range
-                } else {
-                    self.current_token_range()
-                },
+                self.current_token_range(),
             );
         } else {
             if self.at_simple_stmt() {
