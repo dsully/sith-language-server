@@ -43,6 +43,19 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
 
 pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     match notif.method.as_str() {
+        notification::Cancel::METHOD => local_notification_task::<notification::Cancel>(notif),
+        notification::DidChange::METHOD => {
+            local_notification_task::<notification::DidChange>(notif)
+        }
+        notification::DidChangeConfiguration::METHOD => {
+            local_notification_task::<notification::DidChangeConfiguration>(notif)
+        }
+        notification::DidChangeWorkspace::METHOD => {
+            local_notification_task::<notification::DidChangeWorkspace>(notif)
+        }
+        notification::DidClose::METHOD => local_notification_task::<notification::DidClose>(notif),
+        notification::DidOpen::METHOD => local_notification_task::<notification::DidOpen>(notif),
+        notification::SetTrace::METHOD => local_notification_task::<notification::SetTrace>(notif),
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
@@ -59,7 +72,7 @@ fn local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, notifier, responder| {
+    Ok(Task::local(|session, notifier, _, responder| {
         let result = R::run(session, notifier, params);
         respond::<R>(id, result, &responder);
     }))
@@ -71,7 +84,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        // TODO(jane): we should log an error if we can't take a snapshot.
+        // TODO: we should log an error if we can't take a snapshot.
         let Some(snapshot) = session.take_snapshot(&R::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
@@ -86,7 +99,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, _| {
+    Ok(Task::local(move |session, notifier, _, _| {
         if let Err(err) = N::run(session, notifier, params) {
             tracing::error!("An error occurred while running {id}: {err}");
         }
@@ -100,7 +113,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        // TODO(jane): we should log an error if we can't take a snapshot.
+        // TODO: we should log an error if we can't take a snapshot.
         let Some(snapshot) = session.take_snapshot(&N::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
