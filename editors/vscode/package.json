@@ -1,5 +1,6 @@
 {
     "name": "sith-language-server",
+    "publisher": "LaBatata101",
     "description": "A Visual Studio Code extension for the Sith Language Server",
     "license": "MIT",
     "version": "0.1.0",
@@ -111,37 +112,37 @@
                     "default": null,
                     "markdownDescription": "Set rule codes to enable. Use `ALL` to enable all rules. See [the documentation](https://docs.astral.sh/ruff/settings/#lint_select) for more details.",
                     "examples": [
-                      [
-                        "E4",
-                        "E7",
-                        "E9",
-                        "F"
-                      ]
+                        [
+                            "E4",
+                            "E7",
+                            "E9",
+                            "F"
+                        ]
                     ],
                     "items": {
-                      "type": "string"
+                        "type": "string"
                     },
                     "scope": "resource",
                     "type": "array"
-                  },
-                  "sith.ruff.lint.extendSelect": {
+                },
+                "sith.ruff.lint.extendSelect": {
                     "default": null,
                     "markdownDescription": "Enable additional rule codes on top of existing configuration, instead of overriding it. Use `ALL` to enable all rules.",
                     "items": {
-                      "type": "string"
+                        "type": "string"
                     },
                     "scope": "resource",
                     "type": "array"
-                  },
-                  "sith.ruff.lint.ignore": {
+                },
+                "sith.ruff.lint.ignore": {
                     "default": null,
                     "markdownDescription": "Set rule codes to disable. See [the documentation](https://docs.astral.sh/ruff/settings/#lint_ignore) for more details.",
                     "items": {
-                      "type": "string"
+                        "type": "string"
                     },
                     "scope": "resource",
                     "type": "array"
-                  }
+                }
             }
         }
     },
