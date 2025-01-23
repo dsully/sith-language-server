@@ -3,3 +3,6 @@
 .idea
 node_modules
 editors/vscode/dist
+editors/vscode/out
+editors/vscode/*.vsix
+.vscode/
