@@ -1,0 +1,17 @@
+mod completion;
+mod diagnostic;
+mod format;
+mod goto_definition;
+mod references;
+
+use super::{
+    define_document_url,
+    traits::{BackgroundDocumentRequestHandler, RequestHandler},
+};
+pub(super) use completion::Completion;
+pub(super) use diagnostic::DocumentDiagnostic;
+pub(super) use format::Format;
+pub(super) use goto_definition::GotoDefinition;
+pub(super) use references::References;
+
+type FormatResponse = Option<Vec<lsp_types::TextEdit>>;
