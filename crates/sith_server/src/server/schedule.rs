@@ -1,7 +1,5 @@
 use std::num::NonZeroUsize;
 
-use crossbeam::channel::Sender;
-
 use crate::session::Session;
 
 mod task;
@@ -14,7 +12,7 @@ use self::{
     thread::ThreadPriority,
 };
 
-use super::client::Client;
+use super::{client::Client, ClientSender};
 
 /// The event loop thread is actually a secondary thread that we spawn from the
 /// _actual_ main thread. This secondary thread has a larger stack size
@@ -45,7 +43,7 @@ impl<'scheduler> Scheduler<'scheduler> {
     pub(super) fn new(
         session: &'scheduler mut Session,
         worker_threads: NonZeroUsize,
-        sender: &Sender<lsp_server::Message>,
+        sender: ClientSender,
     ) -> Self {
         const FMT_THREADS: usize = 1;
         Self {
@@ -80,10 +78,13 @@ impl<'scheduler> Scheduler<'scheduler> {
     pub(super) fn dispatch(&mut self, task: task::Task<'scheduler>) {
         match task {
             Task::Sync(SyncTask { func }) => {
+                let notifier = self.client.notifier();
+                let responder = self.client.responder();
                 func(
                     self.session,
-                    self.client.notifier(),
-                    self.client.responder(),
+                    notifier,
+                    &mut self.client.requester,
+                    responder,
                 );
             }
             Task::Background(BackgroundTaskBuilder {

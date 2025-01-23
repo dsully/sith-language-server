@@ -1,4 +1,4 @@
-//! Types and utilities for working with text, modifying source files, and `Ruff <-> LSP` type conversion.
+//! Types and utilities for working with text, modifying source files, and `Sith <-> LSP` type conversion.
 
 mod convert;
 mod document;
@@ -21,7 +21,7 @@ pub enum PositionEncoding {
     /// Second choice because UTF32 uses a fixed 4 byte encoding for each character (makes conversion relatively easy)
     UTF32,
 
-    /// Ruff's preferred encoding
+    /// Sith's preferred encoding
     UTF8,
 }
 

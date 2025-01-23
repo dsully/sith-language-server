@@ -1,0 +1,100 @@
+---
+source: crates/sith_server/src/session/settings.rs
+expression: options
+---
+HasWorkspaces {
+    global_settings: ClientSettings {
+        interpreter: Some(
+            "",
+        ),
+        ruff: RuffOptions {
+            path: Some(
+                "",
+            ),
+            format: FormatOptions {
+                enable: Some(
+                    false,
+                ),
+                args: Some(
+                    [],
+                ),
+            },
+        },
+        tracing: TracingSettings {
+            log_level: None,
+            log_file: None,
+        },
+    },
+    workspace_settings: [
+        WorkspaceSettings {
+            settings: ClientSettings {
+                interpreter: Some(
+                    "/Users/test/projects/pandas/.venv/bin/python",
+                ),
+                ruff: RuffOptions {
+                    path: Some(
+                        "ruff",
+                    ),
+                    format: FormatOptions {
+                        enable: Some(
+                            true,
+                        ),
+                        args: Some(
+                            [],
+                        ),
+                    },
+                },
+                tracing: TracingSettings {
+                    log_level: None,
+                    log_file: None,
+                },
+            },
+            workspace: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "/Users/test/projects/pandas",
+                query: None,
+                fragment: None,
+            },
+        },
+        WorkspaceSettings {
+            settings: ClientSettings {
+                interpreter: Some(
+                    "/Users/test/projects/scipy/.venv/bin/python",
+                ),
+                ruff: RuffOptions {
+                    path: Some(
+                        "ruff",
+                    ),
+                    format: FormatOptions {
+                        enable: Some(
+                            false,
+                        ),
+                        args: Some(
+                            [],
+                        ),
+                    },
+                },
+                tracing: TracingSettings {
+                    log_level: None,
+                    log_file: None,
+                },
+            },
+            workspace: Url {
+                scheme: "file",
+                cannot_be_a_base: false,
+                username: "",
+                password: None,
+                host: None,
+                port: None,
+                path: "/Users/test/projects/scipy",
+                query: None,
+                fragment: None,
+            },
+        },
+    ],
+}

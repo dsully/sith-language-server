@@ -1,0 +1,30 @@
+---
+source: crates/sith_server/src/session/settings.rs
+expression: options
+---
+GlobalOnly {
+    settings: ClientSettings {
+        interpreter: Some(
+            "/usr/bin/python",
+        ),
+        ruff: RuffOptions {
+            path: Some(
+                "/usr/bin/ruff",
+            ),
+            format: FormatOptions {
+                enable: Some(
+                    true,
+                ),
+                args: Some(
+                    [
+                        "--line-length 80",
+                    ],
+                ),
+            },
+        },
+        tracing: TracingSettings {
+            log_level: None,
+            log_file: None,
+        },
+    },
+}

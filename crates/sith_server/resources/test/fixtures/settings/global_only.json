@@ -1,0 +1,13 @@
+{
+    "settings": {
+        "executable": "sith-lsp",
+        "interpreter": "/usr/bin/python",
+        "ruff": {
+            "path": "/usr/bin/ruff",
+            "format": {
+                "enable": true,
+                "args": ["--line-length 80"]
+            }
+        }
+    }
+}

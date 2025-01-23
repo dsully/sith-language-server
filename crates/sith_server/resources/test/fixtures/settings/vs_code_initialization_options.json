@@ -1,0 +1,40 @@
+{
+    "settings": [
+        {
+            "workspace": "file:///Users/test/projects/pandas",
+            "executable": "sith-lsp",
+            "interpreter": "/Users/test/projects/pandas/.venv/bin/python",
+            "ruff": {
+                "path": "ruff",
+                "format": {
+                    "enable": true,
+                    "args": []
+                }
+            }
+        },
+        {
+            "workspace": "file:///Users/test/projects/scipy",
+            "interpreter": "/Users/test/projects/scipy/.venv/bin/python",
+            "executable": "",
+            "ruff": {
+                "path": "ruff",
+                "format": {
+                    "enable": false,
+                    "args": []
+                }
+            }
+        }
+    ],
+    "globalSettings": {
+        "workspace": "/",
+        "path": "",
+        "interpreter": "",
+        "ruff": {
+            "path": "",
+            "format": {
+                "enable": false,
+                "args": []
+            }
+        }
+    }
+}
