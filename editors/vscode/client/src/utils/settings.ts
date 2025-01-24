@@ -30,7 +30,7 @@ export type Ruff = {
 export interface ISettings {
     workspace: string;
     executable: string;
-    interpreter: string;
+    interpreter?: string;
     ruff: Ruff;
     logLevel?: LogLevel;
     logFile?: string;
@@ -56,7 +56,7 @@ function getInterpreterFromSetting(namespace: string, scope?: ConfigurationScope
 
 export function getWorkspaceSettings(namespace: string, workspace: WorkspaceFolder): ISettings {
     const config = getConfiguration(namespace);
-    let interpreter: string = getInterpreterFromSetting(namespace, workspace) ?? "";
+    let interpreter: string = getInterpreterFromSetting(namespace, workspace);
 
     return {
         workspace: workspace.uri.fsPath,

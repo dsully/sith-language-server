@@ -67,7 +67,7 @@
                     "type": "string"
                 },
                 "sith.interpreter": {
-                    "default": "",
+                    "default": null,
                     "markdownDescription": "Path to a Python interpreter to use to run the LSP server.",
                     "scope": "resource",
                     "type": "string"
