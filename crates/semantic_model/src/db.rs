@@ -9,6 +9,7 @@ use bimap::BiHashMap;
 use python_ast::ModModule;
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
+use python_utils::is_python_module;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
@@ -482,18 +483,18 @@ impl SymbolTableDb {
         name: &str,
         offset: u32,
     ) -> Option<FxHashMap<FileId, Vec<SymbolOccurrence>>> {
-        let global_scope = ScopeId::global();
+        let (scope_id, _) = self.find_enclosing_scope(file, offset);
         let mut result: FxHashMap<FileId, Vec<SymbolOccurrence>> = FxHashMap::default();
         // add the references from the current `file`
         let references = self
             .table(file)
-            .references(name, global_scope)
+            .references(name, scope_id)
             .or(self.builtin_symbols().references(name))?;
         let current_file_id = self.indexer().file_id(file);
         result.insert(current_file_id, references.clone());
 
         let declaration =
-            self.symbol_declaration(file, name, global_scope, DeclarationQuery::AtOffset(offset))?;
+            self.symbol_declaration(file, name, scope_id, DeclarationQuery::AtOffset(offset))?;
 
         let symbol = self.symbol(file, declaration.symbol_id);
         let scope = self.scope(file, symbol.definition_scope());
@@ -507,21 +508,27 @@ impl SymbolTableDb {
         }
 
         let origin_path = if let DeclarationKind::Stmt(DeclStmt::Import {
-            source: Some(source),
+            source: Some(source_path),
         }) = &declaration.kind
         {
-            // add the references from the source file of the imported symbol
-            let references = self
-                .table(source)
-                .references(name, global_scope)
-                .or(self.builtin_symbols().references(name))?;
-            let source_id = self.indexer().file_id(source);
-            result.insert(source_id, references.clone());
+            // TODO: if `name` was declared as an import statement in `source_path`
+            // we need to get the references of that import's `source`
 
-            source
+            // only get the reference if `name` isn't a module
+            if !is_python_module(name, source_path) {
+                // add the references from the source file of the imported symbol
+                let references = self
+                    .table(source_path)
+                    .references(name, ScopeId::global())
+                    .or(self.builtin_symbols().references(name))?;
+                let source_id = self.indexer().file_id(source_path);
+                result.insert(source_id, references.clone());
+            }
+
+            source_path
         } else {
             // If the symbol was not imported then it was declared in `file`, therefore we need to
-            // look for symbols that were imported and contains the same path as `file`.
+            // look for symbols that were imported and contains the same source path as `file`.
             file
         };
 
@@ -534,11 +541,11 @@ impl SymbolTableDb {
             .filter(|(&file_id, _)| file_id != current_file_id)
         {
             if let Some(DeclarationKind::Stmt(DeclStmt::Import { source })) = table
-                .symbol_declaration(name, global_scope, DeclarationQuery::Last)
+                .symbol_declaration(name, ScopeId::global(), DeclarationQuery::Last)
                 .map(|decl| &decl.kind)
             {
                 if source.as_ref().is_some_and(|path| path == origin_path) {
-                    let Some(references) = table.references(name, global_scope) else {
+                    let Some(references) = table.references(name, ScopeId::global()) else {
                         continue;
                     };
                     result.insert(*file_id, references.clone());

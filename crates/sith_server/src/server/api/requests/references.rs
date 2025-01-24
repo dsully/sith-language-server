@@ -48,9 +48,9 @@ impl super::BackgroundDocumentRequestHandler for References {
             return Ok(None);
         };
 
-        let references = db
-            .references(&current_file_path, symbol_name, offset)
-            .unwrap();
+        let Some(references) = db.references(&current_file_path, symbol_name, offset) else {
+            return Ok(None);
+        };
         let mut locations = Vec::with_capacity(references.len());
         for (file_id, symbol_occurences) in references {
             let path = db.indexer().file_path(&file_id);
