@@ -261,7 +261,6 @@ impl Server {
             diagnostic_provider: Some(types::DiagnosticServerCapabilities::Options(
                 DiagnosticOptions {
                     identifier: Some(crate::DIAGNOSTIC_NAME.into()),
-                    // multi-file analysis could change this
                     inter_file_dependencies: false,
                     workspace_diagnostics: false,
                     work_done_progress_options: WorkDoneProgressOptions {

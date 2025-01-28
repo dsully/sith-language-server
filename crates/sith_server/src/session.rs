@@ -49,11 +49,11 @@ impl Session {
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
-            workspaces: Workspaces::new(workspaces)?,
+            workspaces: Workspaces::new(workspaces, global_settings.clone())?,
+            global_settings,
         })
     }
 

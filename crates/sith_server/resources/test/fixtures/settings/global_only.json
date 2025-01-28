@@ -1,6 +1,5 @@
 {
     "settings": {
-        "executable": "sith-lsp",
         "interpreter": "/usr/bin/python",
         "ruff": {
             "path": "/usr/bin/ruff",

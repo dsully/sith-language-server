@@ -17,7 +17,10 @@ use super::settings::ResolvedClientSettings;
 use super::ClientSettings;
 
 #[derive(Default)]
-pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
+pub(crate) struct Workspaces {
+    workspaces: BTreeMap<PathBuf, Workspace>,
+    global_settings: ClientSettings,
+}
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
@@ -96,13 +99,16 @@ impl Deref for SymbolTableDbRef {
 }
 
 impl Workspace {
-    pub(crate) fn new(root: &Url, settings: ClientSettings) -> crate::Result<(PathBuf, Self)> {
+    pub(crate) fn new(
+        root: &Url,
+        settings: ClientSettings,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<(PathBuf, Self)> {
         let path = root
             .to_file_path()
             .map_err(|_| anyhow!("workspace URL was not a file path!"))?;
 
-        let resolved_settings =
-            ResolvedClientSettings::with_workspace(&settings, &ClientSettings::default());
+        let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
         let Some(interpreter) = resolved_settings.interpreter() else {
             return Err(anyhow!("Python interpreter path not set!"));
         };
@@ -127,12 +133,17 @@ impl Workspace {
 }
 
 impl Workspaces {
-    pub(super) fn new(urls: Vec<(Url, ClientSettings)>) -> crate::Result<Self> {
-        Ok(Self(
-            urls.into_iter()
-                .map(|(url, settings)| Workspace::new(&url, settings))
+    pub(super) fn new(
+        urls: Vec<(Url, ClientSettings)>,
+        global_settings: ClientSettings,
+    ) -> crate::Result<Self> {
+        Ok(Self {
+            workspaces: urls
+                .into_iter()
+                .map(|(url, settings)| Workspace::new(&url, settings, &global_settings))
                 .collect::<crate::Result<_>>()?,
-        ))
+            global_settings,
+        })
     }
 
     pub(super) fn open_workspace_folder(
@@ -140,8 +151,8 @@ impl Workspaces {
         folder_url: &Url,
         settings: ClientSettings,
     ) -> crate::Result<()> {
-        let (path, workspace) = Workspace::new(folder_url, settings)?;
-        self.0.insert(path, workspace);
+        let (path, workspace) = Workspace::new(folder_url, settings, &self.global_settings)?;
+        self.workspaces.insert(path, workspace);
         Ok(())
     }
 
@@ -149,7 +160,7 @@ impl Workspaces {
         let path = folder_url
             .to_file_path()
             .map_err(|()| anyhow!("Folder URI was not a proper file path"))?;
-        self.0
+        self.workspaces
             .remove(&path)
             .ok_or_else(|| anyhow!("Tried to remove non-existent folder {}", path.display()))?;
         Ok(())
@@ -250,7 +261,7 @@ impl Workspaces {
 
     fn entry_for_url(&self, url: &Url) -> Option<(&Path, &Workspace)> {
         let path = url.to_file_path().ok()?;
-        self.0
+        self.workspaces
             .range(..path)
             .next_back()
             .map(|(path, workspace)| (path.as_path(), workspace))
@@ -258,7 +269,7 @@ impl Workspaces {
 
     fn entry_for_url_mut(&mut self, url: &Url) -> Option<(&Path, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
-        self.0
+        self.workspaces
             .range_mut(..path)
             .next_back()
             .map(|(path, workspace)| (path.as_path(), workspace))

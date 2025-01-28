@@ -12,7 +12,7 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientSettings {
     interpreter: Option<String>,
-    ruff: RuffOptions,
+    ruff: Option<RuffOptions>,
 
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
@@ -48,8 +48,8 @@ struct WorkspaceSettings {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RuffOptions {
     path: Option<String>,
-    format: FormatOptions,
-    lint: LintOptions,
+    format: Option<FormatOptions>,
+    lint: Option<LintOptions>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -116,6 +116,7 @@ pub(crate) struct ResolvedClientSettings {
 }
 
 /// Built from the initialization options provided by the client.
+#[derive(Debug)]
 pub(crate) struct AllSettings {
     pub(crate) global_settings: ClientSettings,
     /// If this is `None`, the client only passed in global settings.
@@ -193,30 +194,36 @@ impl ResolvedClientSettings {
             interpreter: Self::resolve_optional(all_settings, |settings| {
                 settings.interpreter.clone()
             }),
-            ruff_path: Self::resolve_optional(all_settings, |settings| settings.ruff.path.clone()),
+            ruff_path: Self::resolve_optional(all_settings, |settings| {
+                settings.ruff.as_ref()?.path.clone()
+            }),
             format_enable: Self::resolve_or(
                 all_settings,
-                |settings| settings.ruff.format.enable,
+                |settings| settings.ruff.as_ref()?.format.as_ref()?.enable,
                 true,
             ),
             format_args: Self::resolve_or(
                 all_settings,
-                |settings| settings.ruff.format.args.clone(),
+                |settings| settings.ruff.as_ref()?.format.as_ref()?.args.clone(),
                 Vec::new(),
             ),
-            lint_enable: Self::resolve_or(all_settings, |settings| settings.ruff.lint.enable, true),
+            lint_enable: Self::resolve_or(
+                all_settings,
+                |settings| settings.ruff.as_ref()?.lint.as_ref()?.enable,
+                true,
+            ),
             lint_select: Self::resolve_optional(all_settings, |settings| {
-                settings.ruff.lint.select.clone()
+                settings.ruff.as_ref()?.lint.as_ref()?.select.clone()
             }),
             lint_extend_select: Self::resolve_optional(all_settings, |settings| {
-                settings.ruff.lint.extend_select.clone()
+                settings.ruff.as_ref()?.lint.as_ref()?.extend_select.clone()
             }),
             lint_ignore: Self::resolve_optional(all_settings, |settings| {
-                settings.ruff.lint.ignore.clone()
+                settings.ruff.as_ref()?.lint.as_ref()?.ignore.clone()
             }),
             lint_args: Self::resolve_or(
                 all_settings,
-                |settings| settings.ruff.lint.args.clone(),
+                |settings| settings.ruff.as_ref()?.lint.as_ref()?.args.clone(),
                 Vec::new(),
             ),
         }

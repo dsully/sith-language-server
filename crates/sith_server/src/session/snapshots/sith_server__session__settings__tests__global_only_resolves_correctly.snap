@@ -7,21 +7,26 @@ GlobalOnly {
         interpreter: Some(
             "/usr/bin/python",
         ),
-        ruff: RuffOptions {
-            path: Some(
-                "/usr/bin/ruff",
-            ),
-            format: FormatOptions {
-                enable: Some(
-                    true,
+        ruff: Some(
+            RuffOptions {
+                path: Some(
+                    "/usr/bin/ruff",
                 ),
-                args: Some(
-                    [
-                        "--line-length 80",
-                    ],
+                format: Some(
+                    FormatOptions {
+                        enable: Some(
+                            true,
+                        ),
+                        args: Some(
+                            [
+                                "--line-length 80",
+                            ],
+                        ),
+                    },
                 ),
+                lint: None,
             },
-        },
+        ),
         tracing: TracingSettings {
             log_level: None,
             log_file: None,

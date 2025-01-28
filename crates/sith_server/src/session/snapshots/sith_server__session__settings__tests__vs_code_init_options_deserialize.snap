@@ -7,19 +7,24 @@ HasWorkspaces {
         interpreter: Some(
             "",
         ),
-        ruff: RuffOptions {
-            path: Some(
-                "",
-            ),
-            format: FormatOptions {
-                enable: Some(
-                    false,
+        ruff: Some(
+            RuffOptions {
+                path: Some(
+                    "",
                 ),
-                args: Some(
-                    [],
+                format: Some(
+                    FormatOptions {
+                        enable: Some(
+                            false,
+                        ),
+                        args: Some(
+                            [],
+                        ),
+                    },
                 ),
+                lint: None,
             },
-        },
+        ),
         tracing: TracingSettings {
             log_level: None,
             log_file: None,
@@ -31,70 +36,60 @@ HasWorkspaces {
                 interpreter: Some(
                     "/Users/test/projects/pandas/.venv/bin/python",
                 ),
-                ruff: RuffOptions {
-                    path: Some(
-                        "ruff",
-                    ),
-                    format: FormatOptions {
-                        enable: Some(
-                            true,
+                ruff: Some(
+                    RuffOptions {
+                        path: Some(
+                            "ruff",
                         ),
-                        args: Some(
-                            [],
+                        format: Some(
+                            FormatOptions {
+                                enable: Some(
+                                    true,
+                                ),
+                                args: Some(
+                                    [],
+                                ),
+                            },
                         ),
+                        lint: None,
                     },
-                },
+                ),
                 tracing: TracingSettings {
                     log_level: None,
                     log_file: None,
                 },
             },
-            workspace: Url {
-                scheme: "file",
-                cannot_be_a_base: false,
-                username: "",
-                password: None,
-                host: None,
-                port: None,
-                path: "/Users/test/projects/pandas",
-                query: None,
-                fragment: None,
-            },
+            workspace: "file:///Users/test/projects/pandas",
         },
         WorkspaceSettings {
             settings: ClientSettings {
                 interpreter: Some(
                     "/Users/test/projects/scipy/.venv/bin/python",
                 ),
-                ruff: RuffOptions {
-                    path: Some(
-                        "ruff",
-                    ),
-                    format: FormatOptions {
-                        enable: Some(
-                            false,
+                ruff: Some(
+                    RuffOptions {
+                        path: Some(
+                            "ruff",
                         ),
-                        args: Some(
-                            [],
+                        format: Some(
+                            FormatOptions {
+                                enable: Some(
+                                    false,
+                                ),
+                                args: Some(
+                                    [],
+                                ),
+                            },
                         ),
+                        lint: None,
                     },
-                },
+                ),
                 tracing: TracingSettings {
                     log_level: None,
                     log_file: None,
                 },
             },
-            workspace: Url {
-                scheme: "file",
-                cannot_be_a_base: false,
-                username: "",
-                password: None,
-                host: None,
-                port: None,
-                path: "/Users/test/projects/scipy",
-                query: None,
-                fragment: None,
-            },
+            workspace: "file:///Users/test/projects/scipy",
         },
     ],
 }
