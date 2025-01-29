@@ -5,7 +5,7 @@
 
 An experimental Python language server.
 
-# Implemented LSP methods so far
+# LSP methods implemented so far
 
 - textDocument/completion
 - textDocument/publishDiagnostics
@@ -13,6 +13,7 @@ An experimental Python language server.
 - textDocument/references
 - textDocument/formatting
 - textDocument/didChange
+- textDocument/documentHighlight
 - textDocument/didOpen
 - textDocument/didClose
 - workspace/didChangeWorkspaceFolders

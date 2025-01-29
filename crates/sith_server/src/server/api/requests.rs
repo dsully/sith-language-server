@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostic;
+mod document_highlight;
 mod format;
 mod goto_definition;
 mod references;
@@ -10,6 +11,7 @@ use super::{
 };
 pub(super) use completion::Completion;
 pub(super) use diagnostic::DocumentDiagnostic;
+pub(super) use document_highlight::DocumentHighlight;
 pub(super) use format::Format;
 pub(super) use goto_definition::GotoDefinition;
 pub(super) use references::References;
