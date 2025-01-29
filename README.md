@@ -1,7 +1,7 @@
 # SithLSP
 
 > [!WARNING]
-> THIS SOFTWARE IS A WORK IN PROGRESS!
+> THIS SOFTWARE IS IN ALPHA STATE EXPECT BREAKING CHANGES, CRASHES, EXPLOSIONS AND EVERYTHING IN BETWEEN!
 
 An experimental Python language server.
 
@@ -149,3 +149,7 @@ Set rule codes to disable. See [the documentation](https://docs.astral.sh/ruff/s
 
 - type: `string[]`
 - default: `null`
+
+# Acknowledgements
+
+- [Ruff](https://github.com/astral-sh/ruff) - ~~stole~~ borrowed lots of code from them.
