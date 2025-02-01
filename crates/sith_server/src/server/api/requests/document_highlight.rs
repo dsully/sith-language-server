@@ -39,7 +39,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         let node_stack = NodeStack::default().build(ast.suite());
 
         let Some(symbol_name) = node_at_offset(node_stack.nodes(), offset)
-            .and_then(|node_with_parent| identifier_from_node(&node_with_parent.node, offset))
+            .and_then(|node_with_parent| identifier_from_node(node_with_parent.node(), offset))
         else {
             return Ok(None);
         };

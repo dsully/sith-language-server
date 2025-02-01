@@ -14,7 +14,7 @@ pub struct NodeId;
 
 #[derive(Debug)]
 pub struct NodeWithParent<'a> {
-    pub node: AnyNodeRef<'a>,
+    node: AnyNodeRef<'a>,
     parent: Option<NodeId>,
 }
 

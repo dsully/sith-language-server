@@ -83,7 +83,7 @@ fn find_declaration<'a>(
     let node_with_parent = node_at_offset(nodes, offset)?;
     let mut is_python_module = IsPythonModule::No;
 
-    let (path, declaration) = match node_with_parent.node {
+    let (path, declaration) = match node_with_parent.node() {
         AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, attr, .. }) => {
             let mut type_inferer = TypeInferer::new(db, scope, path);
             let (path, scope) = match type_inferer.infer_expr(value.as_ref(), nodes) {
@@ -133,7 +133,7 @@ fn find_declaration<'a>(
             (path, declaration)
         }
         _ => {
-            let symbol_name = identifier_from_node(&node_with_parent.node, offset)?;
+            let symbol_name = identifier_from_node(node_with_parent.node(), offset)?;
 
             let mut final_path = path;
             let mut declaration = db.symbol_declaration(

@@ -70,7 +70,7 @@ fn position_context<'nodes>(
         return PositionCtx::Module;
     };
 
-    match node.node {
+    match node.node() {
         AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. }) => {
             let Some(declaration) = db.symbol_declaration(
                 path,
@@ -107,7 +107,7 @@ fn position_context<'nodes>(
             let Some(parent_node) = node.parent_id().and_then(|id| nodes.get(id)) else {
                 unreachable!()
             };
-            match parent_node.node {
+            match parent_node.node() {
                 // Collects all segments before the cursor position
                 // Example: in `import foo.bar.|` (where | is cursor)
                 //   * prev_segments would contain ["foo", "bar"]
@@ -185,7 +185,7 @@ fn position_context<'nodes>(
                 return PositionCtx::Module;
             };
 
-            match parent_node.node {
+            match parent_node.node() {
                 AnyNodeRef::CallExpr(call_expr) => {
                     get_call_expr_position_ctx(&call_expr.func, db, path, scope_id, nodes)
                 }

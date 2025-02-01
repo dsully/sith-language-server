@@ -1286,13 +1286,13 @@ mod tests {
 
         let reveal_type_func = stack.nodes().iter().find(|node_with_parent| {
             matches!(
-                node_with_parent.node,
+                node_with_parent.node(),
                 AnyNodeRef::CallExpr(python_ast::CallExpr { func, .. })
                     if matches!(func.as_ref(), Expr::Name(python_ast::NameExpr {id, ..}) if id == "reveal_type")
             )
         }).expect("to find `reveal_type` function call");
         let expr_to_infer = reveal_type_func
-            .node
+            .node()
             .as_call_expr()
             .unwrap()
             .arguments

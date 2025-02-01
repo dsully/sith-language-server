@@ -345,7 +345,7 @@ impl<'a> SymbolTableBuilder<'a> {
                     unreachable!("declaration node wasn't set")
                 };
                 let node_with_parent = self.nodes.get(declaration_node).unwrap();
-                let kind = match node_with_parent.node {
+                let kind = match node_with_parent.node() {
                     AnyNodeRef::StmtFor(_) => DeclarationKind::For,
                     AnyNodeRef::NamedExpr(_) => DeclarationKind::Named,
                     AnyNodeRef::Comprehension(_) => DeclarationKind::For,
