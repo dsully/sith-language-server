@@ -45,6 +45,11 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             req,
             BackgroundSchedule::LatencySensitive,
         ),
+        request::ResolveCompletionItem::METHOD => background_request_task::<
+            request::ResolveCompletionItem,
+        >(
+            req, BackgroundSchedule::LatencySensitive
+        ),
         request::Format::METHOD => {
             background_request_task::<request::Format>(req, BackgroundSchedule::Fmt)
         }

@@ -10,6 +10,12 @@ use crate::{
 #[newtype_index]
 pub struct SymbolId;
 
+impl SymbolId {
+    pub fn sentinel() -> Self {
+        SymbolId::MAX
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Symbols(IndexVec<SymbolId, Symbol>);
 

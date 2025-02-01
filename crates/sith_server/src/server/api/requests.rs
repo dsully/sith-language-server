@@ -9,6 +9,7 @@ use super::{
     define_document_url,
     traits::{BackgroundDocumentRequestHandler, RequestHandler},
 };
+pub(super) use completion::resolve::ResolveCompletionItem;
 pub(super) use completion::Completion;
 pub(super) use diagnostic::DocumentDiagnostic;
 pub(super) use document_highlight::DocumentHighlight;

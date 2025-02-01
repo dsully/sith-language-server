@@ -20,6 +20,7 @@ use ruff_python_resolver::{
     python_version::PythonVersion,
 };
 use rustc_hash::{FxHashMap, FxHasher};
+use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::{
@@ -39,6 +40,7 @@ type FxBiHashMap<L, R> =
     BiHashMap<L, R, BuildHasherDefault<FxHasher>, BuildHasherDefault<FxHasher>>;
 
 #[newtype_index]
+#[derive(Serialize, Deserialize)]
 pub struct FileId;
 
 #[derive(Debug, Default, Clone)]
@@ -211,12 +213,14 @@ impl Indexer {
 
     fn index_content(
         &self,
-        path: impl AsRef<Path>,
+        file_id: FileId,
         content: &str,
     ) -> (SymbolTable, Parsed<ModModule>, Vec<PathBuf>) {
+        let path = self.file_path(&file_id);
         let parsed_file = parse_module(content);
         let table = SymbolTableBuilder::new(
-            path.as_ref(),
+            path,
+            file_id,
             ImportResolverConfig::new(&self.exec_env, &self.config, &self.host),
         )
         .build(parsed_file.suite());
@@ -246,7 +250,8 @@ impl Indexer {
                     if path.is_file() && path.extension().is_some_and(|ext| ext != "so") {
                         let content = fs::read_to_string(path)
                             .unwrap_or_else(|e| panic!("{e}: {}", path.display()));
-                        let (table, parsed_file, import_paths) = self.index_content(path, &content);
+                        let (table, parsed_file, import_paths) =
+                            self.index_content(file_id, &content);
 
                         Some((file_id, table, parsed_file, import_paths))
                     } else {
@@ -340,8 +345,8 @@ impl Indexer {
                     return;
                 }
 
-                let (table, parsed_file, mut import_paths) = self.index_content(&file_path, source);
                 let file_id = self.push_file(file_path);
+                let (table, parsed_file, mut import_paths) = self.index_content(file_id, source);
 
                 self.tables.insert(file_id, table);
                 self.asts.insert(file_id, parsed_file);
@@ -357,7 +362,7 @@ impl Indexer {
             }
             Source::Update { new, .. } => {
                 let file_id = self.file_id(&file_path);
-                let (table, parsed_file, import_paths) = self.index_content(file_path, new);
+                let (table, parsed_file, import_paths) = self.index_content(file_id, new);
 
                 self.tables.insert(file_id, table);
                 self.asts.insert(file_id, parsed_file);
@@ -402,8 +407,9 @@ impl SymbolTableDb {
         let builtins_path = self.indexer().typeshed_path().join("stdlib/builtins.pyi");
         let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file to exist");
 
+        let file_id = self.indexer_mut().push_file(builtins_path.clone());
         let (table, parsed_file, resolved_paths) =
-            self.indexer_mut().index_content(&builtins_path, &content);
+            self.indexer_mut().index_content(file_id, &content);
 
         self.builtin_symbol_table = BuiltinSymbolTable {
             table,
@@ -459,6 +465,35 @@ impl SymbolTableDb {
         self.table(file)
             .declaration(decl_id)
             .expect("expect declaration for id")
+    }
+
+    pub fn resolve_declaration(
+        &self,
+        file: &PathBuf,
+        decl_id: DeclId,
+        symbol_name: &str,
+    ) -> Option<&Declaration> {
+        let mut declaration = self.declaration(file, decl_id);
+        while matches!(
+            declaration.kind,
+            DeclarationKind::Stmt(DeclStmt::Import { .. } | DeclStmt::ImportAlias(_))
+        ) {
+            declaration = match &declaration.kind {
+                DeclarationKind::Stmt(DeclStmt::Import {
+                    source: Some(source),
+                }) => self.symbol_declaration(
+                    source,
+                    symbol_name,
+                    ScopeId::global(),
+                    DeclarationQuery::Last,
+                )?,
+                DeclarationKind::Stmt(DeclStmt::ImportAlias(decl_id)) => {
+                    self.declaration(file, *decl_id)
+                }
+                _ => unreachable!(),
+            };
+        }
+        Some(declaration)
     }
 
     pub fn symbol_declaration(

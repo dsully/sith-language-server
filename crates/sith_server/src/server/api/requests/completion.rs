@@ -16,16 +16,19 @@ use ruff_text_size::Ranged;
 use semantic_model::{
     builtins::BUILTIN_KEYWORDS,
     db::{FileId, SymbolTableDb},
-    declaration::{DeclStmt, DeclarationKind, DeclarationQuery},
+    declaration::{DeclStmt, Declaration, DeclarationKind, DeclarationQuery},
     type_inference::{PythonType, ResolvedType, TypeInferer},
     Scope, ScopeId, Symbol,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     edit::position_to_offset,
     server::{api::LSPResult, client::Notifier, Result},
     session::DocumentSnapshot,
 };
+
+pub(super) mod resolve;
 
 #[derive(Debug)]
 enum PositionCtx<'node> {
@@ -53,6 +56,104 @@ enum PositionCtx<'node> {
         file_id: FileId,
         node_id: NodeId,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CompletionItemData {
+    document_uri: PathBuf,
+    payload: Option<CompletionItemDataPayload>,
+}
+
+impl CompletionItemData {
+    fn payload(self) -> Option<CompletionItemDataPayload> {
+        self.payload
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CompletionItemSymbolData {
+    file_id: FileId,
+    node_id: NodeId,
+    is_builtin: bool,
+}
+
+impl CompletionItemSymbolData {
+    fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    fn node_id(&self) -> NodeId {
+        self.node_id
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CompletionItemModuleData {
+    path: PathBuf,
+}
+
+impl CompletionItemModuleData {
+    fn path(&self) -> &PathBuf {
+        &self.path
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+enum CompletionItemDataPayload {
+    Module(CompletionItemModuleData),
+    Symbol(CompletionItemSymbolData),
+}
+
+struct CompletionItemCandidate {
+    label: String,
+    kind: CompletionItemKind,
+    data: Option<CompletionItemDataPayload>,
+}
+
+impl CompletionItemCandidate {
+    fn builtin(name: String, kind: CompletionItemKind, declaration: &Declaration) -> Self {
+        Self {
+            label: name,
+            kind,
+            data: Some(CompletionItemDataPayload::Symbol(
+                CompletionItemSymbolData {
+                    node_id: declaration.node_id,
+                    file_id: declaration.file_id,
+                    is_builtin: true,
+                },
+            )),
+        }
+    }
+
+    fn module(module_name: String, module_path: PathBuf) -> Self {
+        Self {
+            label: module_name,
+            kind: CompletionItemKind::MODULE,
+            data: Some(CompletionItemDataPayload::Module(
+                CompletionItemModuleData { path: module_path },
+            )),
+        }
+    }
+
+    fn keyword(keyword: String) -> Self {
+        Self {
+            label: keyword,
+            kind: CompletionItemKind::KEYWORD,
+            data: None,
+        }
+    }
+
+    fn parameter(name: &str) -> Self {
+        Self {
+            label: format!("{}=", name),
+            kind: CompletionItemKind::VARIABLE,
+            data: None,
+        }
+    }
+
+    fn sort_text(&self) -> String {
+        format!("{:?}", self.kind)
+    }
 }
 
 fn position_context<'nodes>(
@@ -275,13 +376,25 @@ fn get_completion_candidates_from_scope<'a>(
     db: &'a SymbolTableDb,
     path: &'a PathBuf,
     scope: &'a Scope,
-) -> impl Iterator<Item = (String, CompletionItemKind)> + use<'a> {
+) -> impl Iterator<Item = CompletionItemCandidate> + use<'a> {
+    // TODO: handle multiple symbol declarations
     scope
         .symbols()
         .map(|(symbol_name, symbol_id)| (symbol_name, db.symbol(path, *symbol_id)))
         .filter_map(|(symbol_name, symbol)| {
-            get_completion_item_kind(db, path, symbol)
-                .map(|item_kind| (symbol_name.to_string(), item_kind))
+            let declaration =
+                db.resolve_declaration(path, symbol.declarations().last(), symbol_name)?;
+            get_completion_item_kind(db, path, symbol).map(|kind| CompletionItemCandidate {
+                label: symbol_name.to_string(),
+                kind,
+                data: Some(CompletionItemDataPayload::Symbol(
+                    CompletionItemSymbolData {
+                        file_id: declaration.file_id,
+                        node_id: declaration.node_id,
+                        is_builtin: false,
+                    },
+                )),
+            })
         })
 }
 
@@ -289,7 +402,7 @@ fn get_completion_candidates_from_scope_and_parents<'a>(
     db: &'a SymbolTableDb,
     path: &'a PathBuf,
     scope: &'a Scope,
-) -> Vec<(String, CompletionItemKind)> {
+) -> Vec<CompletionItemCandidate> {
     let mut candidates: Vec<_> = get_completion_candidates_from_scope(db, path, scope).collect();
     // add the symbols from the parent scope until it reaches the global scope
     for parent_scope in scope.parent_scopes(db, path) {
@@ -300,28 +413,30 @@ fn get_completion_candidates_from_scope_and_parents<'a>(
 
 fn get_thirdparty_and_builtin_modules_candidates(
     db: &SymbolTableDb,
-) -> Vec<(String, CompletionItemKind)> {
+) -> Vec<CompletionItemCandidate> {
     let mut module_names = Vec::new();
     for search_path in db.indexer().python_search_paths() {
         module_names.extend(
             get_python_module_names_in_path(search_path)
                 .into_iter()
-                .map(|module| (module, CompletionItemKind::MODULE)),
+                .map(|(module_name, module_path)| {
+                    CompletionItemCandidate::module(module_name, module_path)
+                }),
         );
     }
     module_names
 }
 
-fn get_python_module_candidates(path: impl AsRef<Path>) -> Vec<(String, CompletionItemKind)> {
+fn get_python_module_candidates(path: impl AsRef<Path>) -> Vec<CompletionItemCandidate> {
     get_python_module_names_in_path(path)
         .into_iter()
-        .map(|module| (module, CompletionItemKind::MODULE))
+        .map(|(module_name, module_path)| CompletionItemCandidate::module(module_name, module_path))
         .collect()
 }
 
 fn builtin_completion_candidates(
     db: &SymbolTableDb,
-) -> impl Iterator<Item = (String, CompletionItemKind)> + use<'_> {
+) -> impl Iterator<Item = CompletionItemCandidate> + use<'_> {
     db.builtin_symbols()
         .scope()
         .symbols()
@@ -339,8 +454,13 @@ fn builtin_completion_candidates(
                 declaration.kind,
                 DeclarationKind::Stmt(DeclStmt::Import { .. } | DeclStmt::ImportAlias(_))
             ) {
-                get_completion_item_kind(db, db.builtin_symbols().path(), symbol)
-                    .map(|item_kind| (symbol_name.to_string(), item_kind))
+                get_completion_item_kind(db, db.builtin_symbols().path(), symbol).map(|item_kind| {
+                    CompletionItemCandidate::builtin(
+                        symbol_name.to_string(),
+                        item_kind,
+                        declaration,
+                    )
+                })
             } else {
                 None
             }
@@ -375,7 +495,7 @@ fn get_completion_candidates(
         completion_candidates.extend(
             BUILTIN_KEYWORDS
                 .iter()
-                .map(|keyword| (keyword.to_string(), CompletionItemKind::KEYWORD)),
+                .map(|keyword| CompletionItemCandidate::keyword(keyword.to_string())),
         );
     }
 
@@ -425,8 +545,8 @@ fn get_completion_candidates(
             level,
             prev_segments,
         } => {
-            // The test cursor is in one of these cases:
-            // Ex) `from .foo.bar` or `from .`
+            // The text cursor is in one of these cases:
+            // Ex) Relative import: `from .foo.bar<cursor>` or `from .<cursor>`
             if *level > 0 {
                 let mut parent_dir = Path::new("");
                 for _ in 0..*level {
@@ -442,7 +562,7 @@ fn get_completion_candidates(
                     completion_candidates =
                         get_python_module_candidates(parent_dir.join(prev_segments.join("/")));
                 }
-            // Ex) `from foo.bar`
+            // Ex) Absolute import: `from foo.bar<cursor>`
             } else if !prev_segments.is_empty() {
                 let segment = prev_segments.last()?;
                 let declaration =
@@ -454,7 +574,7 @@ fn get_completion_candidates(
                 } else {
                     return None;
                 }
-            // Ex) `from `
+            // Ex) `from <cursor>`
             } else {
                 completion_candidates = get_python_module_candidates(db.indexer().root_path());
                 completion_candidates.extend(get_thirdparty_and_builtin_modules_candidates(db));
@@ -464,7 +584,8 @@ fn get_completion_candidates(
             level,
             last_segment,
         } => {
-            // Ex) `from . import foo` or `from .foo import bar`
+            // Handles relative imports:
+            // Ex) `from . import foo<cursor>` or `from .foo import bar<cursor>`
             if last_segment.is_none() && *level > 0 {
                 let mut parent_dir = Path::new("");
                 for _ in 0..*level {
@@ -474,19 +595,31 @@ fn get_completion_candidates(
                     parent_dir = path;
                 }
 
+                // TODO: refactor this
                 return Some(
                     get_python_module_names_in_path(parent_dir)
                         .into_iter()
-                        .map(|module| CompletionItem {
+                        .map(|(module, module_path)| CompletionItem {
                             label: module,
                             kind: Some(CompletionItemKind::MODULE),
                             sort_text: Some("Module".to_string()),
+                            data: Some(
+                                serde_json::to_value(CompletionItemData {
+                                    document_uri: path.to_path_buf(),
+                                    payload: Some(CompletionItemDataPayload::Module(
+                                        CompletionItemModuleData { path: module_path },
+                                    )),
+                                })
+                                .expect("no error when serializing completion item data!"),
+                            ),
                             ..Default::default()
                         })
                         .collect(),
                 );
             }
 
+            // Handles absolute imports:
+            // Ex) `from foo import bar<cursor>`
             let last_seg = last_segment.unwrap();
             let declaration =
                 db.symbol_declaration(path, last_seg, scope, DeclarationQuery::Last)?;
@@ -516,8 +649,7 @@ fn get_completion_candidates(
                 .iter_non_variadic_params()
                 .map(|pwd| &pwd.parameter)
             {
-                completion_candidates
-                    .push((format!("{}=", param.name), CompletionItemKind::VARIABLE))
+                completion_candidates.push(CompletionItemCandidate::parameter(&param.name))
             }
 
             let scope = db.scope(path, scope);
@@ -537,7 +669,7 @@ fn get_completion_candidates(
                     fn process_base_classes(
                         db: &SymbolTableDb,
                         base_classes: &[ResolvedType],
-                        completion_candidates: &mut Vec<(String, CompletionItemKind)>,
+                        completion_candidates: &mut Vec<CompletionItemCandidate>,
                     ) {
                         for resolved_type in base_classes {
                             let ResolvedType::KnownType(PythonType::Class(class)) = resolved_type
@@ -580,10 +712,17 @@ fn get_completion_candidates(
     Some(
         completion_candidates
             .into_iter()
-            .map(|(symbol_name, item_kind)| CompletionItem {
-                label: symbol_name,
-                kind: Some(item_kind),
-                sort_text: Some(format!("{:?}", item_kind)),
+            .map(|completion_item_candidate| CompletionItem {
+                sort_text: Some(completion_item_candidate.sort_text()),
+                label: completion_item_candidate.label,
+                kind: Some(completion_item_candidate.kind),
+                data: Some(
+                    serde_json::to_value(CompletionItemData {
+                        document_uri: path.to_path_buf(),
+                        payload: completion_item_candidate.data,
+                    })
+                    .expect("no error when serializing completion item data!"),
+                ),
                 ..Default::default()
             })
             .collect(),

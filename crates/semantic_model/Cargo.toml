@@ -26,6 +26,7 @@ log = { workspace = true }
 directories = { workspace = true }
 walkdir = { workspace = true }
 indexmap = { workspace = true }
+serde = { workspace = true }
 
 [build-dependencies]
 path-slash = { workspace = true }

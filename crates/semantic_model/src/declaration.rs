@@ -7,7 +7,7 @@ use python_ast_utils::nodes::NodeId;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_text_size::TextRange;
 
-use crate::{symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
+use crate::{db::FileId, symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
 
 #[newtype_index]
 pub struct DeclId;
@@ -16,9 +16,16 @@ pub struct DeclId;
 pub struct Declarations(IndexVec<DeclId, Declaration>);
 
 impl Declarations {
-    pub fn insert(&mut self, kind: DeclarationKind, node_id: NodeId, range: TextRange) -> DeclId {
+    pub fn insert(
+        &mut self,
+        file_id: FileId,
+        kind: DeclarationKind,
+        node_id: NodeId,
+        range: TextRange,
+    ) -> DeclId {
         self.0.push(Declaration {
-            symbol_id: 0u32.into(),
+            file_id,
+            symbol_id: SymbolId::sentinel(),
             node_id,
             kind,
             range,
@@ -84,6 +91,7 @@ pub enum DeclStmt {
 
 #[derive(Debug, Clone)]
 pub struct Declaration {
+    pub file_id: FileId,
     pub symbol_id: SymbolId,
     pub node_id: NodeId,
     pub kind: DeclarationKind,

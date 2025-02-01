@@ -7,6 +7,8 @@ use std::{
 use ruff_python_resolver::{python_platform::PythonPlatform, python_version::PythonVersion};
 use serde::{Deserialize, Serialize};
 
+pub mod nodes;
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PythonPathResult {
     pub paths: Vec<PathBuf>,
@@ -81,7 +83,7 @@ pub fn get_python_search_paths(interpreter_path: impl AsRef<Path>) -> PythonPath
     }
 }
 
-pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<String> {
+pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<(String, PathBuf)> {
     assert!(path.as_ref().is_dir());
 
     let mut names = Vec::new();
@@ -103,13 +105,14 @@ pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<String> {
 
             if init_file.exists() {
                 if let Some(dir_name) = sub_path.file_name().and_then(|name| name.to_str()) {
-                    names.push(dir_name.to_string());
+                    names.push((dir_name.to_string(), sub_path));
                 }
             }
         } else if file_type.is_file() {
-            if let Some(file_name) = entry.path().file_name().and_then(|name| name.to_str()) {
+            let path = entry.path();
+            if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
                 if file_name.ends_with(".py") && file_name != "__init__.py" {
-                    names.push(file_name.trim_end_matches(".py").to_string());
+                    names.push((file_name.trim_end_matches(".py").to_string(), path));
                 }
             }
         }

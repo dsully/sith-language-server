@@ -252,7 +252,7 @@ impl Server {
                 },
             )),
             completion_provider: Some(CompletionOptions {
-                resolve_provider: Some(false),
+                resolve_provider: Some(true),
                 trigger_characters: Some(vec![".".to_string()]),
                 work_done_progress_options: Default::default(),
                 all_commit_characters: None,

@@ -18,6 +18,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
 use crate::{
+    db::FileId,
     declaration::{
         DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery, Declarations,
         SymbolDeclarations,
@@ -160,6 +161,7 @@ impl<'a> ImportResolverConfig<'a> {
 // TODO: handle `nonlocal`, `global` and IMPLEMENT -> *variable shadowing*
 pub struct SymbolTableBuilder<'a> {
     file_info: FileInfo<'a>,
+    file_id: FileId,
 
     curr_scope: ScopeId,
     curr_node: Option<NodeId>,
@@ -175,12 +177,17 @@ pub struct SymbolTableBuilder<'a> {
 }
 
 impl<'a> SymbolTableBuilder<'a> {
-    pub fn new(filepath: &'a Path, import_resolver_cfg: ImportResolverConfig<'a>) -> Self {
+    pub fn new(
+        filepath: &'a Path,
+        file_id: FileId,
+        import_resolver_cfg: ImportResolverConfig<'a>,
+    ) -> Self {
         Self {
             file_info: FileInfo {
                 path: filepath,
                 is_builtin_stub_file: filepath.ends_with("stdlib/builtins.pyi"),
             },
+            file_id,
             curr_scope: ScopeId::global(),
             curr_node: None,
             curr_declaration_node: None,
@@ -252,7 +259,7 @@ impl<'a> SymbolTableBuilder<'a> {
             }
         }
 
-        let decl_id = self.table.decls.insert(kind, node_id, range);
+        let decl_id = self.table.decls.insert(self.file_id, kind, node_id, range);
         let symbol_id = if let Some(symbol_id) = scope.symbol_id(name) {
             let symbol = self.table.symbols.get_mut(symbol_id).unwrap();
             symbol.push_declaration_id(decl_id);
