@@ -35,12 +35,12 @@ pub fn identifier_from_node<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option
         AnyNodeRef::NameExpr(python_ast::NameExpr { id, .. }) => id,
         AnyNodeRef::Parameter(python_ast::Parameter { name, .. }) => name.as_str(),
         AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. })
-            if name.range.contains(offset.into()) =>
+            if name.range.contains_inclusive(offset.into()) =>
         {
             name.as_str()
         }
         AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. })
-            if name.range.contains(offset.into()) =>
+            if name.range.contains_inclusive(offset.into()) =>
         {
             name.as_str()
         }
@@ -58,7 +58,7 @@ pub fn identifier_from_node<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option
             identifier_at_offset(module, offset, module.range)?
         }
         AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, attr, .. }) => {
-            if attr.range().contains(offset.into()) {
+            if attr.range().contains_inclusive(offset.into()) {
                 return Some(attr);
             }
 
