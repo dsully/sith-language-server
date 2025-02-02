@@ -6,7 +6,7 @@ use lsp_types::{
 };
 use python_ast_utils::nodes::NodeStack;
 use python_parser::parse_module;
-use python_utils::nodes::get_documentation_string;
+use python_utils::nodes::get_documentation_string_from_node;
 
 use crate::server::api::{
     requests::completion::CompletionItemData,
@@ -78,7 +78,7 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
                     .get(completion_item_symbol_data.node_id())
                     .unwrap();
 
-                get_documentation_string(completion_item_node)
+                get_documentation_string_from_node(completion_item_node)
             }
             None => return Ok(original_completion),
         };

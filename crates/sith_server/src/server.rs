@@ -7,6 +7,7 @@ use connection::ConnectionInitializer;
 use lsp_server as lsp;
 use lsp_types as types;
 use lsp_types::CompletionOptions;
+use lsp_types::HoverProviderCapability;
 use types::ClientCapabilities;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
@@ -273,6 +274,7 @@ impl Server {
             references_provider: Some(OneOf::Left(true)),
             rename_provider: Some(OneOf::Left(true)),
             document_highlight_provider: Some(OneOf::Left(true)),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
             ..Default::default()
         }
     }
