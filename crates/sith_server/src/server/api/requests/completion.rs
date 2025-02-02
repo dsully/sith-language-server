@@ -682,19 +682,11 @@ fn get_completion_candidates(
                                 .extend(get_completion_candidates_from_scope(db, path, body_scope));
 
                             // Recursively process nested base classes
-                            process_base_classes(
-                                db,
-                                &class.class_bases(db, class.node_stack(db).nodes()),
-                                completion_candidates,
-                            );
+                            process_base_classes(db, &class.class_bases(db), completion_candidates);
                         }
                     }
 
-                    process_base_classes(
-                        db,
-                        &class.class_bases(db, class.node_stack(db).nodes()),
-                        &mut completion_candidates,
-                    );
+                    process_base_classes(db, &class.class_bases(db), &mut completion_candidates);
                 }
                 ResolvedType::KnownType(PythonType::Module(file_id)) => {
                     let path = db.indexer().file_path(&file_id);

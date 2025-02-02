@@ -82,6 +82,7 @@ impl KnownClass {
             .expect("to find class declaration");
         ClassType {
             file_id: db.indexer().file_id(db.builtin_symbols().path()),
+            node_id: decl.node_id,
             symbol_id: decl.symbol_id,
             body_scope: decl.body_scope().unwrap(),
             known: Some(known),
@@ -174,6 +175,7 @@ impl ClassBase {
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct ClassType {
     pub file_id: FileId,
+    pub node_id: NodeId,
     pub symbol_id: SymbolId,
     pub body_scope: ScopeId,
     pub known: Option<KnownClass>,
@@ -193,18 +195,19 @@ impl ClassType {
         NodeStack::default().build(suite)
     }
 
-    pub fn class_bases(&self, db: &SymbolTableDb, nodes: &Nodes) -> Vec<ResolvedType> {
+    pub fn class_bases(&self, db: &SymbolTableDb) -> Vec<ResolvedType> {
         let path = db.indexer().file_path(&self.file_id);
         let symbol = db.symbol(path, self.symbol_id);
         let declaration = db.declaration(path, symbol.declarations().last());
-        let builtin_node_stack = db.builtin_symbols().node_stack();
 
-        let node_with_parent = if symbol.is_builtin() {
-            builtin_node_stack.nodes().get(declaration.node_id).unwrap()
+        let node_stack = if symbol.is_builtin() {
+            db.builtin_symbols().node_stack()
         } else {
-            nodes.get(declaration.node_id).unwrap()
+            let suite = db.indexer().ast(path).unwrap().suite();
+            NodeStack::default().build(suite)
         };
 
+        let node_with_parent = node_stack.nodes().get(declaration.node_id).unwrap();
         match node_with_parent.node() {
             AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt {
                 arguments: Some(arguments),
@@ -215,25 +218,24 @@ impl ClassType {
                 arguments
                     .args
                     .iter()
-                    .map(|arg| type_inferer.infer_expr(arg, nodes))
+                    .map(|arg| type_inferer.infer_expr(arg, node_stack.nodes()))
                     .collect()
             }
             _ => Vec::new(),
         }
     }
 
-    pub(crate) fn is_cyclically_defined(&self, db: &SymbolTableDb, nodes: &Nodes) -> bool {
+    pub(crate) fn is_cyclically_defined(&self, db: &SymbolTableDb) -> bool {
         fn is_cyclically_defined_recursive(
             db: &SymbolTableDb,
             class: ClassType,
-            nodes: &Nodes,
             classes_to_watch: &mut IndexSet<ClassType>,
         ) -> bool {
             if !classes_to_watch.insert(class) {
                 return true;
             }
             for explicit_base_class in class
-                .class_bases(db, nodes)
+                .class_bases(db)
                 .into_iter()
                 .filter_map(|ty| ty.into_class())
             {
@@ -242,8 +244,7 @@ impl ClassType {
                 // there could easily be a situation where two bases have the same class in their MROs;
                 // that isn't enough to constitute the class being cyclically defined.
                 let classes_to_watch_len = classes_to_watch.len();
-                if is_cyclically_defined_recursive(db, explicit_base_class, nodes, classes_to_watch)
-                {
+                if is_cyclically_defined_recursive(db, explicit_base_class, classes_to_watch) {
                     return true;
                 }
                 classes_to_watch.truncate(classes_to_watch_len);
@@ -251,12 +252,10 @@ impl ClassType {
             false
         }
 
-        self.class_bases(db, nodes)
+        self.class_bases(db)
             .into_iter()
             .filter_map(|ty| ty.into_class())
-            .any(|base_class| {
-                is_cyclically_defined_recursive(db, base_class, nodes, &mut IndexSet::new())
-            })
+            .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
     }
 
     pub fn constructor<'db>(&self, db: &'db SymbolTableDb) -> Option<&'db Declaration> {
@@ -544,7 +543,7 @@ where
         result
     }
 
-    fn infer_node(&mut self, node: &NodeWithParent, nodes: &Nodes) -> ResolvedType {
+    pub fn infer_node(&mut self, node: &NodeWithParent, nodes: &Nodes) -> ResolvedType {
         match node.node() {
             AnyNodeRef::StmtAssign(python_ast::AssignStmt { targets, value, .. }) => {
                 let [target, ..] = targets.as_slice() else {
@@ -612,6 +611,7 @@ where
 
                 ResolvedType::KnownType(PythonType::Class(ClassType {
                     file_id: self.db.indexer().file_id(self.path),
+                    node_id: alias_declaration.node_id,
                     symbol_id: collection_declaration.symbol_id,
                     body_scope: alias_declaration.body_scope().unwrap(),
                     known: None,
@@ -640,6 +640,7 @@ where
 
                 ResolvedType::KnownType(PythonType::Class(ClassType {
                     file_id: self.db.indexer().file_id(self.path),
+                    node_id: special_form_declaration.node_id,
                     symbol_id: special_type_declaration.symbol_id,
                     body_scope: special_form_declaration.body_scope().unwrap(),
                     known: None,
@@ -730,7 +731,7 @@ where
                 match value_type {
                     ResolvedType::KnownType(PythonType::Class(class)) => {
                         // TODO: how do we upstream this error?
-                        let Ok(mro_result) = compute_mro(self.db, class, nodes) else {
+                        let Ok(mro_result) = compute_mro(self.db, class) else {
                             return ResolvedType::Unknown;
                         };
                         let Some((path, declaration)) = mro_result
@@ -852,7 +853,8 @@ where
         match declaration_node.node() {
             AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. }) => {
                 ResolvedType::KnownType(PythonType::Class(ClassType {
-                    file_id: self.db.indexer().file_id(self.path),
+                    file_id: declaration.file_id,
+                    node_id: declaration.node_id,
                     symbol_id: declaration.symbol_id,
                     body_scope: declaration.body_scope().unwrap(),
                     known: KnownClass::from_symbol(name),
@@ -861,7 +863,7 @@ where
             AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { body, returns, .. }) => {
                 if !self.contains_flag(TypeInferFlags::IN_CALL_EXPR) {
                     return ResolvedType::KnownType(PythonType::Function {
-                        file_id: self.db.indexer().file_id(self.path),
+                        file_id: declaration.file_id,
                         symbol_id: declaration.symbol_id,
                         body_scope: declaration.body_scope().unwrap(),
                         node_id: declaration.node_id,
@@ -1017,6 +1019,7 @@ where
                     (
                         ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::List),
@@ -1029,6 +1032,7 @@ where
                     ) => {
                         return ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::List),
@@ -1038,6 +1042,7 @@ where
                     (
                         ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::Tuple),
@@ -1050,6 +1055,7 @@ where
                     ) => {
                         return ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::Tuple),
@@ -1082,6 +1088,7 @@ where
                     (
                         ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::Set),
@@ -1094,6 +1101,7 @@ where
                     ) => {
                         return ResolvedType::KnownType(PythonType::Class(ClassType {
                             file_id,
+                            node_id,
                             symbol_id,
                             body_scope,
                             known: Some(KnownClass::Set),

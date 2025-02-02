@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-use python_ast_utils::nodes::{NodeStack, Nodes};
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -8,14 +7,10 @@ use crate::{
     type_inference::{ClassBase, ClassType, KnownClass},
 };
 
-pub(crate) fn compute_mro(
-    db: &SymbolTableDb,
-    class: ClassType,
-    nodes: &Nodes,
-) -> Result<Vec<ClassBase>, String> {
-    let class_bases = class.class_bases(db, nodes);
+pub(crate) fn compute_mro(db: &SymbolTableDb, class: ClassType) -> Result<Vec<ClassBase>, String> {
+    let class_bases = class.class_bases(db);
 
-    if !class_bases.is_empty() && class.is_cyclically_defined(db, nodes) {
+    if !class_bases.is_empty() && class.is_cyclically_defined(db) {
         return Err("cyclically defined class".into());
     }
 
@@ -57,10 +52,7 @@ pub(crate) fn compute_mro(
                     )
                 }
                 ClassBase::Class(single_class) => {
-                    let path = db.indexer().file_path(&single_class.file_id);
-                    let stack = NodeStack::default().build(db.indexer().ast(path).unwrap().suite());
-
-                    compute_mro(db, single_class, stack.nodes()).map(|class_bases| {
+                    compute_mro(db, single_class).map(|class_bases| {
                         std::iter::once(ClassBase::Class(class))
                             .chain(class_bases)
                             .collect()
@@ -97,7 +89,7 @@ pub(crate) fn compute_mro(
                             .collect(),
                     ),
                     ClassBase::Class(class) => {
-                        seqs.push(compute_mro(db, *class, nodes)?.into());
+                        seqs.push(compute_mro(db, *class)?.into());
                     }
                 }
             }
