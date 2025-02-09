@@ -23,7 +23,7 @@ use crate::{
         DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery, Declarations,
         SymbolDeclarations,
     },
-    symbol::{Symbol, SymbolFlags, SymbolId, SymbolOccurrence, Symbols},
+    symbol::{Symbol, SymbolFlags, SymbolId, Symbols},
     Scope, ScopeId, ScopeKind, Scopes,
 };
 
@@ -104,15 +104,6 @@ impl SymbolTable {
             declaration
         })
     }
-
-    /// Retrievies the references a symbol `name`. The `scope` is used to help
-    /// lookup the symbol name.
-    ///
-    /// Returns `None` if it fails to lookup the symbol name.
-    pub fn references(&self, name: &str, scope_id: ScopeId) -> Option<&Vec<SymbolOccurrence>> {
-        self.lookup_symbol(name, scope_id)
-            .map(|symbol| symbol.references())
-    }
 }
 
 impl Default for SymbolTable {
@@ -158,7 +149,7 @@ impl<'a> ImportResolverConfig<'a> {
     }
 }
 
-// TODO: handle `nonlocal`, `global` and IMPLEMENT -> *variable shadowing*
+// TODO: handle `nonlocal`, `global` and *variable shadowing*
 pub struct SymbolTableBuilder<'a> {
     file_info: FileInfo<'a>,
     file_id: FileId,
@@ -285,8 +276,6 @@ impl<'a> SymbolTableBuilder<'a> {
         let declaration = self.table.decls.get_mut(decl_id).unwrap();
         declaration.symbol_id = symbol_id;
 
-        self.push_reference(name, SymbolOccurrence::Declaration(range));
-
         (decl_id, symbol_id)
     }
 
@@ -320,53 +309,25 @@ impl<'a> SymbolTableBuilder<'a> {
         self.curr_node = self.nodes.parend_id(node_id);
     }
 
-    fn push_reference(&mut self, name: &str, kind: SymbolOccurrence) {
-        let scope = self
-            .table
-            .scope(self.curr_scope)
-            .expect("current scope when handling load context");
-        let symbol = if let Some(symbol_id) = scope.symbol_id(name) {
-            self.table.symbols.get_mut(symbol_id)
-        } else {
-            // If we didn' t found the symbol in `self.curr_scope`, search in its parents
-            // scopes until it reaches the global scope.
-            scope.parent().and_then(|parent_id| {
-                self.table
-                    .scopes
-                    .ancestors(parent_id)
-                    .find_map(|scope| scope.symbol_id(name))
-                    .and_then(|symbol_id| self.table.symbols.get_mut(symbol_id))
-            })
-        };
-
-        if let Some(symbol) = symbol {
-            symbol.push_reference(kind);
-        }
-    }
-
     fn handle_context(&mut self, ctx: &ContextExpr, name: &str, range: &TextRange) {
-        match ctx {
-            ContextExpr::Load => self.push_reference(name, SymbolOccurrence::Reference(*range)),
-            ContextExpr::Store => {
-                let Some(declaration_node) = self.curr_declaration_node else {
-                    unreachable!("declaration node wasn't set")
-                };
-                let node_with_parent = self.nodes.get(declaration_node).unwrap();
-                let kind = match node_with_parent.node() {
-                    AnyNodeRef::StmtFor(_) => DeclarationKind::For,
-                    AnyNodeRef::NamedExpr(_) => DeclarationKind::Named,
-                    AnyNodeRef::Comprehension(_) => DeclarationKind::For,
-                    AnyNodeRef::WithItem(_) => DeclarationKind::WithItem,
-                    AnyNodeRef::StmtAssign(_) => DeclarationKind::Stmt(DeclStmt::Assignment),
-                    AnyNodeRef::StmtAugAssign(_) => DeclarationKind::Stmt(DeclStmt::AugAssign),
-                    AnyNodeRef::StmtAnnAssign(_) => DeclarationKind::Stmt(DeclStmt::AnnAssign),
-                    AnyNodeRef::StmtTypeAlias(_) => DeclarationKind::Stmt(DeclStmt::TypeAlias),
-                    _ => unreachable!("declaration node not handled!"),
-                };
+        if ctx == &ContextExpr::Store {
+            let Some(declaration_node) = self.curr_declaration_node else {
+                unreachable!("declaration node wasn't set")
+            };
+            let node_with_parent = self.nodes.get(declaration_node).unwrap();
+            let kind = match node_with_parent.node() {
+                AnyNodeRef::StmtFor(_) => DeclarationKind::For,
+                AnyNodeRef::NamedExpr(_) => DeclarationKind::Named,
+                AnyNodeRef::Comprehension(_) => DeclarationKind::For,
+                AnyNodeRef::WithItem(_) => DeclarationKind::WithItem,
+                AnyNodeRef::StmtAssign(_) => DeclarationKind::Stmt(DeclStmt::Assignment),
+                AnyNodeRef::StmtAugAssign(_) => DeclarationKind::Stmt(DeclStmt::AugAssign),
+                AnyNodeRef::StmtAnnAssign(_) => DeclarationKind::Stmt(DeclStmt::AnnAssign),
+                AnyNodeRef::StmtTypeAlias(_) => DeclarationKind::Stmt(DeclStmt::TypeAlias),
+                _ => unreachable!("declaration node not handled!"),
+            };
 
-                self.push_declaration(name, kind, *range, declaration_node);
-            }
-            _ => (),
+            self.push_declaration(name, kind, *range, declaration_node);
         }
     }
 }
@@ -398,7 +359,6 @@ where
             }) => {
                 self.flags.insert(VisitorFlags::IN_FUNCTION);
 
-                self.push_reference(name, SymbolOccurrence::Declaration(name.range));
                 let (decl_id, _) = self.push_declaration(
                     name,
                     DeclarationKind::Stmt(DeclStmt::Function(ScopeId::sentinel())),
@@ -434,7 +394,6 @@ where
                 decorator_list,
                 ..
             }) => {
-                self.push_reference(name, SymbolOccurrence::Declaration(name.range));
                 let (decl_id, symbol_id) = self.push_declaration(
                     name,
                     DeclarationKind::Stmt(DeclStmt::Class(ScopeId::sentinel())),
@@ -907,9 +866,7 @@ where
                 self.visit_expr(value);
                 self.handle_context(ctx, attr, range);
 
-                if ctx.is_store() {
-                    self.flags.remove(VisitorFlags::IN_ATTRIBUTE_ASSIGNMENT);
-                }
+                self.flags.remove(VisitorFlags::IN_ATTRIBUTE_ASSIGNMENT);
             }
             Expr::Lambda(ast::LambdaExpr {
                 body,

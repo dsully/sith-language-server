@@ -1,6 +1,5 @@
 use bitflags::bitflags;
 use ruff_index::{newtype_index, IndexVec};
-use ruff_text_size::TextRange;
 
 use crate::{
     declaration::{DeclId, SymbolDeclarations},
@@ -32,24 +31,6 @@ impl Symbols {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SymbolOccurrence {
-    Declaration(TextRange),
-    Reference(TextRange),
-}
-
-impl SymbolOccurrence {
-    pub fn is_declaration(&self) -> bool {
-        matches!(self, SymbolOccurrence::Declaration(_))
-    }
-
-    pub fn range(&self) -> TextRange {
-        match self {
-            SymbolOccurrence::Declaration(range) | SymbolOccurrence::Reference(range) => *range,
-        }
-    }
-}
-
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct SymbolFlags: u8 {
@@ -64,7 +45,6 @@ pub struct Symbol {
     declaration_ids: SymbolDeclarations,
     /// Scope where the symbol was defined.
     definition_scope_id: ScopeId,
-    references: Vec<SymbolOccurrence>,
     flags: SymbolFlags,
 }
 
@@ -73,7 +53,6 @@ impl Symbol {
         Self {
             declaration_ids,
             definition_scope_id: scope_id,
-            references: Vec::new(),
             flags: SymbolFlags::empty(),
         }
     }
@@ -96,14 +75,6 @@ impl Symbol {
 
     pub fn set_flag(&mut self, flag: SymbolFlags) {
         self.flags.insert(flag);
-    }
-
-    pub fn push_reference(&mut self, kind: SymbolOccurrence) {
-        self.references.push(kind);
-    }
-
-    pub fn references(&self) -> &Vec<SymbolOccurrence> {
-        &self.references
     }
 
     pub fn definition_scope(&self) -> ScopeId {

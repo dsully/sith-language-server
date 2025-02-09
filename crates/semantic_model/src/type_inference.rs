@@ -518,6 +518,10 @@ impl<'db> TypeInferer<'db> {
             .is_some_and(|flags| flags.contains(flag))
     }
 
+    pub fn set_scope(&mut self, scope_id: ScopeId) {
+        self.curr_scope = scope_id;
+    }
+
     fn infer_in_file<F, R>(&mut self, new_path: &'db PathBuf, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
@@ -593,6 +597,12 @@ impl<'db> TypeInferer<'db> {
             }
             AnyNodeRef::Comprehension(python_ast::Comprehension { iter, .. }) => {
                 self.infer_expr(iter, nodes)
+            }
+            AnyNodeRef::Parameter(python_ast::Parameter { name, .. })
+            | AnyNodeRef::Alias(python_ast::Alias { name, .. })
+            | AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. })
+            | AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. }) => {
+                self.infer_symbol(name, nodes, DeclarationQuery::First)
             }
             _ => self.infer_expr(**node, nodes),
         }
@@ -938,8 +948,11 @@ impl<'db> TypeInferer<'db> {
                 //   class MyClass:
                 //       def method(self): ... # <- `self` has type `MyClass`
                 if let DeclarationKind::InstanceParameter(class_symbol_id) = declaration.kind {
-                    let class_name = self.db.symbol_name(self.path, class_symbol_id);
-                    return self.infer_symbol(class_name, nodes, DeclarationQuery::Last);
+                    let class_symbol = self.db.symbol(self.path, class_symbol_id);
+                    let declaration = self
+                        .db
+                        .declaration(self.path, class_symbol.declarations().last());
+                    return self.resolve_declaration_type(declaration, nodes);
                 }
 
                 if let Some(annotation) = annotation {

@@ -9,7 +9,6 @@ use bimap::BiHashMap;
 use python_ast::ModModule;
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
-use python_utils::is_python_module;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
@@ -25,10 +24,10 @@ use walkdir::WalkDir;
 
 use crate::{
     declaration::{DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery},
-    symbol::{Symbol, SymbolId, SymbolOccurrence},
+    symbol::{Symbol, SymbolId},
     symbol_table::{ImportResolverConfig, SymbolTable, SymbolTableBuilder},
     vendored::setup_typeshed,
-    Scope, ScopeId, ScopeKind,
+    Scope, ScopeId,
 };
 
 pub enum Source<'a> {
@@ -96,10 +95,6 @@ impl BuiltinSymbolTable {
 
     pub fn scope(&self) -> &Scope {
         self.table.scope(self.scope_id()).unwrap()
-    }
-
-    pub fn references(&self, name: &str) -> Option<&Vec<SymbolOccurrence>> {
-        self.table.references(name, self.scope_id())
     }
 
     pub fn symbol_declaration(&self, name: &str) -> Option<&Declaration> {
@@ -278,7 +273,7 @@ impl Indexer {
         }
     }
 
-    fn tables(&self) -> impl Iterator<Item = (&FileId, &SymbolTable)> {
+    pub fn tables(&self) -> impl Iterator<Item = (&FileId, &SymbolTable)> {
         self.tables.iter()
     }
 
@@ -321,8 +316,14 @@ impl Indexer {
             .unwrap_or_else(|| panic!("no `file_id` for {}", file_path.display()))
     }
 
+    // TODO: remove Option type
     pub fn ast(&self, file: &PathBuf) -> Option<&Parsed<ModModule>> {
         self.asts.get(self.files.get_by_path(file)?)
+    }
+
+    pub fn node_stack(&self, file: &PathBuf) -> NodeStack {
+        let suite = self.ast(file).unwrap().suite();
+        NodeStack::default().build(suite)
     }
 
     fn push_file_ids(&mut self, paths: Vec<PathBuf>) -> Vec<FileId> {
@@ -512,85 +513,6 @@ impl SymbolTableDb {
         self.table(file).find_enclosing_scope(offset)
     }
 
-    pub fn references(
-        &self,
-        file: &PathBuf,
-        name: &str,
-        offset: u32,
-    ) -> Option<FxHashMap<FileId, Vec<SymbolOccurrence>>> {
-        let (scope_id, _) = self.find_enclosing_scope(file, offset);
-        let mut result: FxHashMap<FileId, Vec<SymbolOccurrence>> = FxHashMap::default();
-        // add the references from the current `file`
-        let references = self
-            .table(file)
-            .references(name, scope_id)
-            .or(self.builtin_symbols().references(name))?;
-        let current_file_id = self.indexer().file_id(file);
-        result.insert(current_file_id, references.clone());
-
-        let declaration =
-            self.symbol_declaration(file, name, scope_id, DeclarationQuery::AtOffset(offset))?;
-
-        let symbol = self.symbol(file, declaration.symbol_id);
-        let scope = self.scope(file, symbol.definition_scope());
-
-        // short circuit if the symbol was declared locally to a scope
-        if matches!(
-            scope.kind(),
-            ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda | ScopeKind::Comprehension
-        ) {
-            return Some(result);
-        }
-
-        let origin_path = if let DeclarationKind::Stmt(DeclStmt::Import {
-            source: Some(source_path),
-        }) = &declaration.kind
-        {
-            // TODO: if `name` was declared as an import statement in `source_path`
-            // we need to get the references of that import's `source`
-
-            // only get the reference if `name` isn't a module
-            if !is_python_module(name, source_path) {
-                // add the references from the source file of the imported symbol
-                let references = self
-                    .table(source_path)
-                    .references(name, ScopeId::global())
-                    .or(self.builtin_symbols().references(name))?;
-                let source_id = self.indexer().file_id(source_path);
-                result.insert(source_id, references.clone());
-            }
-
-            source_path
-        } else {
-            // If the symbol was not imported then it was declared in `file`, therefore we need to
-            // look for symbols that were imported and contains the same source path as `file`.
-            file
-        };
-
-        // search for imported symbols that have the same path as `origin_path` and add the
-        // references from their files
-        for (file_id, table) in self
-            .indexer()
-            .tables()
-            // filter the already processed file
-            .filter(|(&file_id, _)| file_id != current_file_id)
-        {
-            if let Some(DeclarationKind::Stmt(DeclStmt::Import { source })) = table
-                .symbol_declaration(name, ScopeId::global(), DeclarationQuery::Last)
-                .map(|decl| &decl.kind)
-            {
-                if source.as_ref().is_some_and(|path| path == origin_path) {
-                    let Some(references) = table.references(name, ScopeId::global()) else {
-                        continue;
-                    };
-                    result.insert(*file_id, references.clone());
-                }
-            }
-        }
-
-        Some(result)
-    }
-
     /// Returns the global [`Scope`] of a `file`.
     pub fn global_scope(&self, file: &PathBuf) -> &Scope {
         self.table(file).scope(ScopeId::global()).unwrap()
@@ -602,111 +524,5 @@ impl SymbolTableDb {
 
     pub fn scopes(&self, file: &PathBuf) -> impl Iterator<Item = &Scope> {
         self.table(file).scopes.iter()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use python_utils::{get_python_platform, get_python_search_paths, get_python_version};
-    use ruff_text_size::TextRange;
-    use std::path::{Path, PathBuf};
-
-    use crate::symbol::SymbolOccurrence;
-
-    use super::{Source, SymbolTableDb};
-
-    fn resolve_relative_path(path: impl AsRef<Path>) -> PathBuf {
-        let curr_dir = std::env::current_dir().expect("Failed to get current dir");
-        if path.as_ref().starts_with("..") || path.as_ref().starts_with(".") {
-            let path: PathBuf = path
-                .as_ref()
-                .components()
-                .filter(|c| {
-                    !matches!(
-                        c,
-                        std::path::Component::ParentDir | std::path::Component::CurDir
-                    )
-                })
-                .collect();
-            curr_dir.join(path)
-        } else {
-            curr_dir.join(path)
-        }
-    }
-
-    fn setup_db(path: impl AsRef<Path>, root: impl AsRef<Path>) -> crate::db::SymbolTableDb {
-        let src = std::fs::read_to_string(&path).unwrap();
-        let search_paths = get_python_search_paths("/usr/bin/python");
-        let python_version = get_python_version("/usr/bin/python").unwrap();
-        let python_platform = get_python_platform().unwrap();
-        let mut db = SymbolTableDb::new(
-            root.as_ref().to_path_buf(),
-            python_version,
-            python_platform,
-            search_paths.paths,
-        )
-        .with_builtin_symbols();
-        db.indexer_mut()
-            .add_or_update_file(path.as_ref().to_path_buf(), Source::New(&src));
-        db
-    }
-
-    #[test]
-    fn test_references() {
-        let root = resolve_relative_path("../resources/tests/fixtures/small_project/");
-        let path = resolve_relative_path(
-            "../resources/tests/fixtures/small_project/tim/api/routes/users.py",
-        );
-        let db = setup_db(&path, &root);
-        let mut references = db
-            .references(&path, "get_current_user", 204)
-            .map(|refs| {
-                refs.into_iter()
-                    .map(|(file_id, ranges)| (db.indexer().file_path(&file_id), ranges))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap();
-        references.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-        assert_eq!(
-            references,
-            vec![
-                (
-                    &resolve_relative_path(
-                        "../resources/tests/fixtures/small_project/tim/api/dependencies.py"
-                    ),
-                    vec![
-                        SymbolOccurrence::Declaration(TextRange::new(506.into(), 522.into())),
-                        SymbolOccurrence::Reference(TextRange::new(1350.into(), 1366.into()))
-                    ]
-                ),
-                (
-                    &resolve_relative_path(
-                        "../resources/tests/fixtures/small_project/tim/api/routes/items.py"
-                    ),
-                    vec![
-                        SymbolOccurrence::Declaration(TextRange::new(162.into(), 178.into())),
-                        SymbolOccurrence::Reference(TextRange::new(285.into(), 301.into())),
-                        SymbolOccurrence::Reference(TextRange::new(522.into(), 538.into())),
-                        SymbolOccurrence::Reference(TextRange::new(747.into(), 763.into())),
-                        SymbolOccurrence::Reference(TextRange::new(1149.into(), 1165.into())),
-                        SymbolOccurrence::Reference(TextRange::new(1533.into(), 1549.into())),
-                        SymbolOccurrence::Reference(TextRange::new(1961.into(), 1977.into())),
-                    ]
-                ),
-                (
-                    &resolve_relative_path(
-                        "../resources/tests/fixtures/small_project/tim/api/routes/users.py"
-                    ),
-                    vec![
-                        SymbolOccurrence::Declaration(TextRange::new(180.into(), 196.into())),
-                        SymbolOccurrence::Reference(TextRange::new(953.into(), 969.into())),
-                        SymbolOccurrence::Reference(TextRange::new(2301.into(), 2317.into())),
-                        SymbolOccurrence::Reference(TextRange::new(2937.into(), 2953.into())),
-                        SymbolOccurrence::Reference(TextRange::new(2967.into(), 2983.into())),
-                    ]
-                ),
-            ]
-        );
     }
 }

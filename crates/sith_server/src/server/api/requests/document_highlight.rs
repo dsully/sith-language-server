@@ -7,6 +7,8 @@ use crate::{
     session::DocumentSnapshot,
 };
 
+use super::references::{DoGlobalSearch, IncludeDeclaration, ReferencesFinder};
+
 pub(crate) struct DocumentHighlight;
 
 impl super::RequestHandler for DocumentHighlight {
@@ -23,7 +25,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         _: Notifier,
         params: types::DocumentHighlightParams,
     ) -> Result<Option<Vec<types::DocumentHighlight>>> {
-        let document_path = snapshot
+        let current_file = snapshot
             .url()
             .to_file_path()
             .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
@@ -33,29 +35,32 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         let position = params.text_document_position_params.position;
 
         let offset = position_to_offset(document.contents(), &position, document.index());
-        let (scope, _) = db.find_enclosing_scope(&document_path, offset);
+        let (scope_id, _) = db.find_enclosing_scope(&current_file, offset);
 
-        let ast = db.indexer().ast(&document_path).unwrap();
+        let ast = db.indexer().ast(&current_file).unwrap();
         let node_stack = NodeStack::default().build(ast.suite());
 
-        let Some(symbol_name) = node_at_offset(node_stack.nodes(), offset)
-            .and_then(|node_with_parent| identifier_from_node(node_with_parent.node(), offset))
-        else {
+        let Some(symbol_node) = node_at_offset(node_stack.nodes(), offset) else {
             return Ok(None);
         };
-        let Some(symbol) = db.lookup_symbol(&document_path, symbol_name, scope) else {
+        let Some(symbol_name) = identifier_from_node(symbol_node, offset) else {
             return Ok(None);
         };
+        let references = ReferencesFinder::new(db, &current_file).find(
+            symbol_name,
+            scope_id,
+            symbol_node,
+            ast.suite(),
+            IncludeDeclaration::Yes,
+            DoGlobalSearch::No,
+        );
 
-        let result = symbol
-            .references()
+        let result = references
+            .get(&db.indexer().file_id(&current_file))
+            .unwrap()
             .iter()
-            .map(|symbol_ocurrence| types::DocumentHighlight {
-                range: symbol_ocurrence.range().to_range(
-                    document.contents(),
-                    document.index(),
-                    snapshot.encoding(),
-                ),
+            .map(|range| types::DocumentHighlight {
+                range: range.to_range(document.contents(), document.index(), snapshot.encoding()),
                 // TODO: implement this
                 kind: None,
             })
