@@ -4,7 +4,6 @@ use lsp_types::{
     request::{self as req},
     CompletionItem, Documentation, MarkupContent, Url,
 };
-use python_ast_utils::nodes::NodeStack;
 use python_parser::parse_module;
 use python_utils::nodes::get_documentation_string_from_node;
 
@@ -68,11 +67,14 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
                     .map(|str_expr| str_expr.value.to_string())
             }
             Some(CompletionItemDataPayload::Symbol(completion_item_symbol_data)) => {
-                let path = db
-                    .indexer()
-                    .file_path(&completion_item_symbol_data.file_id());
-                let suite = db.indexer().ast(path).unwrap().suite();
-                let node_stack = NodeStack::default().build(suite);
+                let node_stack = if completion_item_symbol_data.is_builtin {
+                    db.builtin_symbols().node_stack()
+                } else {
+                    let path = db
+                        .indexer()
+                        .file_path(&completion_item_symbol_data.file_id());
+                    db.indexer().node_stack(path)
+                };
                 let completion_item_node = node_stack
                     .nodes()
                     .get(completion_item_symbol_data.node_id())
