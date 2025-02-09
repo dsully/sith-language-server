@@ -478,18 +478,15 @@ bitflags! {
     }
 }
 
-pub struct TypeInferer<'db, 'path> {
+pub struct TypeInferer<'db> {
     db: &'db SymbolTableDb,
-    path: &'path PathBuf,
+    path: &'db PathBuf,
     curr_scope: ScopeId,
     flag_stack: Vec<TypeInferFlags>,
 }
 
-impl<'db, 'path> TypeInferer<'db, 'path>
-where
-    'db: 'path,
-{
-    pub fn new(db: &'db SymbolTableDb, scope_id: ScopeId, path: &'path PathBuf) -> Self {
+impl<'db> TypeInferer<'db> {
+    pub fn new(db: &'db SymbolTableDb, scope_id: ScopeId, path: &'db PathBuf) -> Self {
         Self {
             db,
             path,
@@ -521,7 +518,7 @@ where
             .is_some_and(|flags| flags.contains(flag))
     }
 
-    fn infer_in_file<F, R>(&mut self, new_path: &'path PathBuf, f: F) -> R
+    fn infer_in_file<F, R>(&mut self, new_path: &'db PathBuf, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
@@ -536,6 +533,25 @@ where
         // Execute the provided function with the new context
         let result = f(self);
 
+        // Restore the original context
+        self.path = original_path;
+        self.curr_scope = original_scope;
+
+        result
+    }
+
+    fn infer_in_scope<F, R>(&mut self, path: &'db PathBuf, scope_id: ScopeId, func: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        // Store the original context
+        let original_path = self.path;
+        let original_scope = self.curr_scope;
+
+        // Change to new context
+        self.path = path;
+        self.curr_scope = scope_id;
+        let result = func(self);
         // Restore the original context
         self.path = original_path;
         self.curr_scope = original_scope;
@@ -752,11 +768,17 @@ where
                             return ResolvedType::Unknown;
                         };
 
+                        let definition_scope = self
+                            .db
+                            .symbol(path, declaration.symbol_id)
+                            .definition_scope();
                         let node_stack = NodeStack::default()
                             .build(self.db.indexer().ast(path).unwrap().suite());
                         let nodes = node_stack.nodes();
 
-                        self.resolve_declaration_type(declaration, nodes)
+                        self.infer_in_scope(path, definition_scope, |this| {
+                            this.resolve_declaration_type(declaration, nodes)
+                        })
                     }
                     ResolvedType::KnownType(PythonType::Module(file_id)) => {
                         let module_path = self.db.indexer().file_path(&file_id);
@@ -846,7 +868,7 @@ where
 
     fn resolve_declaration_type(
         &mut self,
-        declaration: &'path Declaration,
+        declaration: &'db Declaration,
         nodes: &Nodes,
     ) -> ResolvedType {
         let declaration_node = nodes.get(declaration.node_id).expect("declaration node");
@@ -944,7 +966,7 @@ where
         &mut self,
         node: &AnyNodeRef,
         name: &str,
-        source_path: &'path PathBuf,
+        source_path: &'db PathBuf,
     ) -> Option<ResolvedType> {
         Some(match node {
             AnyNodeRef::StmtImport(_) => {
@@ -969,7 +991,12 @@ where
         })
     }
 
-    fn infer_symbol(&mut self, name: &str, nodes: &Nodes, query: DeclarationQuery) -> ResolvedType {
+    pub fn infer_symbol(
+        &mut self,
+        name: &str,
+        nodes: &Nodes,
+        query: DeclarationQuery,
+    ) -> ResolvedType {
         let Some(declaration) = self
             .db
             .symbol_declaration(self.path, name, self.curr_scope, query)
