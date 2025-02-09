@@ -50,6 +50,7 @@ pub fn get_python_version(
         ["3", "10"] => PythonVersion::Py310,
         ["3", "11"] => PythonVersion::Py311,
         ["3", "12"] => PythonVersion::Py312,
+        ["3", "13"] => PythonVersion::Py313,
         _ => return Err("Unsupported Python version!"),
     })
 }
