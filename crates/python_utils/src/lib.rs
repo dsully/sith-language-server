@@ -106,7 +106,7 @@ pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<(String, P
 
             if init_file.exists() {
                 if let Some(dir_name) = sub_path.file_name().and_then(|name| name.to_str()) {
-                    names.push((dir_name.to_string(), sub_path));
+                    names.push((dir_name.to_string(), init_file));
                 }
             }
         } else if file_type.is_file() {

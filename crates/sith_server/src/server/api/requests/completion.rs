@@ -595,20 +595,18 @@ fn get_completion_candidates(
                     parent_dir = path;
                 }
 
-                // TODO: refactor this
+                // TODO: refactor this to avoid creating a `CompletionItem` here
                 return Some(
-                    get_python_module_names_in_path(parent_dir)
+                    get_python_module_candidates(parent_dir)
                         .into_iter()
-                        .map(|(module, module_path)| CompletionItem {
-                            label: module,
-                            kind: Some(CompletionItemKind::MODULE),
-                            sort_text: Some("Module".to_string()),
+                        .map(|completion_item_candidate| CompletionItem {
+                            sort_text: Some(completion_item_candidate.sort_text()),
+                            label: completion_item_candidate.label,
+                            kind: Some(completion_item_candidate.kind),
                             data: Some(
                                 serde_json::to_value(CompletionItemData {
                                     document_uri: path.to_path_buf(),
-                                    payload: Some(CompletionItemDataPayload::Module(
-                                        CompletionItemModuleData { path: module_path },
-                                    )),
+                                    payload: completion_item_candidate.data,
                                 })
                                 .expect("no error when serializing completion item data!"),
                             ),
