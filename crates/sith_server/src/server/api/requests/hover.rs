@@ -69,7 +69,11 @@ pub(crate) fn hover(
         _ => return None,
     };
     let path = db.indexer().file_path(&file_id);
-    let node_stack = NodeStack::default().build(db.indexer().ast(path).unwrap().suite());
+    let node_stack = if path.ends_with("stdlib/builtins.pyi") {
+        db.builtin_symbols().node_stack()
+    } else {
+        db.indexer().node_stack(path)
+    };
     let doc_str = get_documentation_string_from_node(node_stack.nodes().get(node_id).unwrap())?;
 
     Some(types::Hover {
