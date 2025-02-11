@@ -217,11 +217,20 @@ where
 
     fn visit_pattern(&mut self, pattern: &'b ast::Pattern) {
         self.push_node(pattern);
-        if let Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) = pattern {
-            for pattern in patterns {
-                self.visit_pattern(pattern);
+        match pattern {
+            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                for pattern in patterns {
+                    self.visit_pattern(pattern);
+                }
             }
+            _ => visitor::walk_pattern(self, pattern),
         }
+        self.pop_node();
+    }
+
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'b python_ast::PatternKeyword) {
+        self.push_node(pattern_keyword);
+        self.visit_pattern(&pattern_keyword.pattern);
         self.pop_node();
     }
 
