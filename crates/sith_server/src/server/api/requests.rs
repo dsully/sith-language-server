@@ -6,6 +6,7 @@ mod goto_definition;
 mod hover;
 mod prepare_rename;
 mod references;
+mod rename;
 
 use super::{
     define_document_url,
@@ -20,5 +21,6 @@ pub(super) use goto_definition::GotoDefinition;
 pub(super) use hover::Hover;
 pub(super) use prepare_rename::PrepareRename;
 pub(super) use references::References;
+pub(super) use rename::Rename;
 
 type FormatResponse = Option<Vec<lsp_types::TextEdit>>;

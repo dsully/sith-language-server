@@ -1,5 +1,6 @@
 //! Data model, state management, and configuration resolution.
 
+mod capabilities;
 mod settings;
 mod workspace;
 
@@ -14,7 +15,7 @@ use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
 use crate::edit::DocumentVersion;
 use crate::PositionEncoding;
 
-use self::settings::ResolvedClientCapabilities;
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
 
 /// The global state for the LSP

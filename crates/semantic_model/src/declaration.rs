@@ -4,6 +4,7 @@ use std::{
 };
 
 use python_ast_utils::nodes::NodeId;
+use python_utils::is_python_module;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_text_size::TextRange;
 
@@ -115,6 +116,17 @@ impl Declaration {
             ) => Some(id),
             _ => None,
         }
+    }
+
+    pub fn is_imported_module(&self, symbol_name: &str) -> bool {
+        matches!(&self.kind, DeclarationKind::Stmt(
+                DeclStmt::Import {
+                    source: Some(source),
+                }
+                | DeclStmt::ImportSegment {
+                    source: Some(source),
+                },
+            ) if is_python_module(symbol_name, source))
     }
 }
 
