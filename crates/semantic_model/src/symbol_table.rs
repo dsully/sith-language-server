@@ -792,26 +792,22 @@ where
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        self.push_node(pattern);
+        let node_id = self.push_node(pattern);
         match pattern {
-            Pattern::MatchAs(ast::PatternMatchAs {
-                name: Some(name),
-                range,
-                ..
-            }) => {
-                self.push_declaration(
-                    name,
-                    DeclarationKind::MatchAs,
-                    *range,
-                    self.curr_node.unwrap(),
-                );
+            Pattern::MatchAs(ast::PatternMatchAs { name, pattern, .. }) => {
+                if let Some(pattern) = pattern {
+                    self.visit_pattern(pattern);
+                }
+                if let Some(name) = name {
+                    self.push_declaration(name, DeclarationKind::MatchAs, name.range, node_id);
+                }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
                 }
             }
-            _ => (),
+            _ => visitor::walk_pattern(self, pattern),
         }
         self.pop_node();
     }
