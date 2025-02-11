@@ -109,12 +109,33 @@ impl Workspace {
             .map_err(|_| anyhow!("workspace URL was not a file path!"))?;
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
-        let Some(interpreter) = resolved_settings.interpreter() else {
-            return Err(anyhow!("Python interpreter path not set!"));
+
+        let (python_search_paths, python_version) = if let Some(interpreter) =
+            resolved_settings.interpreter()
+        {
+            let python_search_paths = get_python_search_paths(interpreter)
+                .map_err(|err| {
+                    tracing::error!("{err}");
+                    show_err_msg!("{err}");
+                })
+                .map(|result| result.paths)
+                .unwrap_or_default();
+            let python_version = get_python_version(interpreter)
+                .map_err(|err| {
+                    tracing::error!("{err}");
+                    show_err_msg!("{err}");
+                })
+                .unwrap_or(PythonVersion::None);
+            (python_search_paths, python_version)
+        } else {
+            tracing::error!("Python interpreter path was not set in settings!");
+            show_err_msg!(
+                "Python interpreter path was not set in settings! Functionality will be limited."
+            );
+            (vec![], PythonVersion::None)
         };
-        let search_paths = get_python_search_paths(interpreter);
-        let python_version = get_python_version(interpreter).map_err(|err| anyhow!(err))?;
-        let python_platform = get_python_platform().map_err(|err| anyhow!(err))?;
+
+        let python_platform = get_python_platform()?;
 
         Ok((
             path.clone(),
@@ -124,7 +145,7 @@ impl Workspace {
                     path,
                     python_version,
                     python_platform,
-                    search_paths.paths,
+                    python_search_paths,
                 ),
                 settings,
             },

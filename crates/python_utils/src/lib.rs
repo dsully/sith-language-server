@@ -14,33 +14,31 @@ pub struct PythonPathResult {
     pub paths: Vec<PathBuf>,
 }
 
-pub fn get_python_platform() -> Result<PythonPlatform, String> {
+pub fn get_python_platform() -> anyhow::Result<PythonPlatform> {
     Ok(match std::env::consts::OS {
         "linux" => PythonPlatform::Linux,
         "macos" => PythonPlatform::Darwin,
         "windows" => PythonPlatform::Windows,
-        platform => return Err(format!("Unsupported platform `{platform}`")),
+        platform => return Err(anyhow::anyhow!("Unsupported platform `{platform}`")),
     })
 }
 
-pub fn get_python_version(
-    interpreter_path: impl AsRef<Path>,
-) -> Result<PythonVersion, &'static str> {
+pub fn get_python_version(interpreter_path: impl AsRef<Path>) -> anyhow::Result<PythonVersion> {
     let output = Command::new(interpreter_path.as_ref())
         .arg("--version")
         .stdout(Stdio::piped())
         .output()
-        .expect("Failed to get python version!");
+        .map_err(|_| anyhow::anyhow!("Failed to get python version!"))?;
 
     let output_str = String::from_utf8(output.stdout).expect("python output is not valid UTF-8");
     let output_segments = output_str.split(" ").collect::<Vec<&str>>();
     let version_output = output_segments
         .get(1)
-        .expect("Incorrect Python version output!");
+        .ok_or_else(|| anyhow::anyhow!("Incorrect Python version output!"))?;
 
     let version_segments = version_output.split(".").collect::<Vec<_>>();
     let [major, minor, ..] = version_segments.as_slice() else {
-        panic!("Incorrect Python version format!")
+        return Err(anyhow::anyhow!("Incorrect Python version format!"));
     };
 
     Ok(match [*major, *minor] {
@@ -51,11 +49,13 @@ pub fn get_python_version(
         ["3", "11"] => PythonVersion::Py311,
         ["3", "12"] => PythonVersion::Py312,
         ["3", "13"] => PythonVersion::Py313,
-        _ => return Err("Unsupported Python version!"),
+        _ => return Err(anyhow::anyhow!("Unsupported Python version!")),
     })
 }
 
-pub fn get_python_search_paths(interpreter_path: impl AsRef<Path>) -> PythonPathResult {
+pub fn get_python_search_paths(
+    interpreter_path: impl AsRef<Path>,
+) -> anyhow::Result<PythonPathResult> {
     let output = Command::new(interpreter_path.as_ref())
         .args([
             "-c",
@@ -69,19 +69,19 @@ pub fn get_python_search_paths(interpreter_path: impl AsRef<Path>) -> PythonPath
         ])
         .stdout(Stdio::piped())
         .output()
-        .expect("Failed to execute python command");
+        .map_err(|_| anyhow::anyhow!("Failed to execute python command"))?;
 
     let json_str = String::from_utf8(output.stdout).expect("python output is not valid UTF-8");
     let result: PythonPathResult =
         serde_json::from_str(&json_str).expect("failed to deserialize JSON");
 
-    PythonPathResult {
+    Ok(PythonPathResult {
         paths: result
             .paths
             .into_iter()
             .filter(|path| path.exists() && path.is_dir())
             .collect(),
-    }
+    })
 }
 
 pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<(String, PathBuf)> {

@@ -8,6 +8,7 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
+    None,
 }
 
 impl PythonVersion {
@@ -21,6 +22,7 @@ impl PythonVersion {
             PythonVersion::Py311 => "python3.11",
             PythonVersion::Py312 => "python3.12",
             PythonVersion::Py313 => "python3.13",
+            PythonVersion::None => "NONE",
         }
     }
 }

@@ -9,3 +9,4 @@ serde_json = { workspace = true }
 walkdir = { workspace = true }
 ruff_python_resolver = { workspace = true }
 python_ast = { workspace = true }
+anyhow = { workspace = true }

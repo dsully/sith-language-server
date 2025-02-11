@@ -1331,7 +1331,7 @@ mod tests {
     }
 
     fn setup_db(src: &str, root: &Path, path: &Path) -> crate::db::SymbolTableDb {
-        let search_paths = get_python_search_paths("/usr/bin/python");
+        let search_paths = get_python_search_paths("/usr/bin/python").unwrap();
         let python_version = get_python_version("/usr/bin/python").unwrap();
         let python_platform = get_python_platform().unwrap();
         let mut db = SymbolTableDb::new(
