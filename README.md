@@ -1,7 +1,7 @@
 # SithLSP
 
 > [!WARNING]
-> THIS SOFTWARE IS IN ALPHA STATE EXPECT BREAKING CHANGES, CRASHES, EXPLOSIONS AND EVERYTHING IN BETWEEN!
+> THIS SOFTWARE IS IN ALPHA STATE EXPECT BUGS, BREAKING CHANGES, CRASHES, EXPLOSIONS AND EVERYTHING IN BETWEEN!
 
 An experimental Python language server.
 
@@ -16,6 +16,8 @@ An experimental Python language server.
 - textDocument/documentHighlight
 - textDocument/didOpen
 - textDocument/didClose
+- textDocument/rename
+- textDocument/prepareRename
 - workspace/didChangeWorkspaceFolders
 
 # How to use
@@ -53,7 +55,29 @@ $ code --install-extension sith-language-server-0.1.0.vsix
 
 ## Neovim
 
-TODO
+Add this to your `init.lua` config file.
+
+```lua
+local pwd = vim.loop.cwd()
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "python",
+  callback = function()
+    vim.lsp.start({
+      name = "SithLSP",
+      filetypes = { "python" },
+      root_dir = pwd,
+      cmd = { "/path/to/sith-lsp" },
+      init_options = {
+        settings = {
+          -- This setting is required for SithLSP to work properly.
+          -- Not settings this will result in limited functionality.
+          interpreter = "/path/to/python"
+        },
+      },
+    })
+  end,
+})
+```
 
 # Settings
 
