@@ -53,8 +53,12 @@ impl Server {
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities = Self::server_capabilities(&client_capabilities);
 
-        let connection =
-            connection.initialize_finish(id, &server_capabilities, crate::SERVER_NAME, "0.1")?;
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::VERSION,
+        )?;
 
         if let Some(trace) = init_params.trace {
             crate::trace::set_trace_value(trace);

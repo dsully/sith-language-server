@@ -9,6 +9,7 @@ mod server;
 mod session;
 mod trace;
 
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const SERVER_NAME: &str = "SithLSP";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Sith";
 
