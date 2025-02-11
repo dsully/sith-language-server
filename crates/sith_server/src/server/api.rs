@@ -60,7 +60,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             )
         }
         request::Hover::METHOD => {
-            background_request_task::<request::Hover>(req, BackgroundSchedule::LatencySensitive)
+            background_request_task::<request::Hover>(req, BackgroundSchedule::Worker)
         }
         request::Rename::METHOD => {
             background_request_task::<request::Rename>(req, BackgroundSchedule::Worker)
