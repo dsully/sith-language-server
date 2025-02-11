@@ -1,6 +1,9 @@
 pub use edit::{Document, PositionEncoding};
 pub use server::Server;
 
+#[macro_use]
+mod message;
+
 mod edit;
 mod server;
 mod session;

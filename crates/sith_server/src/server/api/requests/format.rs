@@ -44,7 +44,8 @@ impl super::BackgroundDocumentRequestHandler for Format {
 
         let document = snapshot.document();
         let Some(ruff_path) = settings.ruff_path() else {
-            tracing::error!("Ruff path was not set!");
+            tracing::warn!("Ruff path was not set in settings!");
+            show_warn_msg!("Ruff path was not set in settings!");
             return Ok(None);
         };
         let mut child = Command::new(ruff_path)

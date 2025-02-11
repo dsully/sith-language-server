@@ -60,6 +60,8 @@ impl Server {
             crate::trace::set_trace_value(trace);
         }
 
+        crate::message::init_messenger(connection.make_sender());
+
         let AllSettings {
             global_settings,
             mut workspace_settings,
