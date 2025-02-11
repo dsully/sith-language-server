@@ -971,7 +971,33 @@ impl<'db> TypeInferer<'db> {
 
                 ResolvedType::Any
             }
+            AnyNodeRef::PatternMatchAs(_) => {
+                self.infer_pattern_match_as_type(declaration_node, nodes)
+            }
             _ => self.infer_node(declaration_node, nodes),
+        }
+    }
+
+    fn infer_pattern_match_as_type(
+        &mut self,
+        node: &NodeWithParent,
+        nodes: &Nodes,
+    ) -> ResolvedType {
+        let Some(parent_node) = nodes.get(node.parent_id().expect("parent node for pattern match"))
+        else {
+            unreachable!()
+        };
+
+        match parent_node.node() {
+            AnyNodeRef::StmtMatch(python_ast::MatchStmt { subject, .. }) => {
+                self.infer_expr(subject.as_ref(), nodes)
+            }
+            // TODO: in a `PatternMatchSequence`, if the `MatchStmt` subject is a collection,
+            // the inferred type should be the elements type of the collection.
+            AnyNodeRef::PatternMatchSequence(python_ast::PatternMatchSequence { .. }) => {
+                self.infer_pattern_match_as_type(parent_node, nodes)
+            }
+            _ => ResolvedType::Unknown,
         }
     }
 
@@ -1487,5 +1513,19 @@ class Base(Super1, Super2):
         reveal_type(self.do_thing())
 "#;
         assert_type(src, "test.py", "class[bool]")
+    }
+
+    #[test]
+    fn test_infer_match_pattern_bind() {
+        let src = r#"
+class Point:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+point = Point()
+match point:
+     case x: reveal_type(x)
+"#;
+        assert_type(src, "test.py", "class[Point]")
     }
 }
