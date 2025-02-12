@@ -9,7 +9,7 @@ use python_ast::{
 };
 use ruff_python_resolver::module_descriptor::ImportModuleDescriptor;
 use ruff_source_file::LineIndex;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub fn node_at_row<'a>(
     nodes: &'a Nodes,
@@ -31,22 +31,23 @@ pub fn node_at_offset<'a>(nodes: &'a Nodes, offset: u32) -> Option<&'a NodeWithP
 }
 
 pub fn identifier_from_node<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option<&'a str> {
+    let offset: TextSize = offset.into();
     Some(match node {
         AnyNodeRef::NameExpr(python_ast::NameExpr { id, .. }) => id,
         AnyNodeRef::Parameter(python_ast::Parameter { name, .. }) => name.as_str(),
         AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. })
-            if name.range.contains_inclusive(offset.into()) =>
+            if name.range.contains_inclusive(offset) =>
         {
             name.as_str()
         }
         AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. })
-            if name.range.contains_inclusive(offset.into()) =>
+            if name.range.contains_inclusive(offset) =>
         {
             name.as_str()
         }
-        AnyNodeRef::Alias(python_ast::Alias { name, .. }) if name.range.contains(offset.into()) => {
+        AnyNodeRef::Alias(python_ast::Alias { name, .. }) if name.range.contains(offset) => {
             if name.contains('.') {
-                identifier_at_offset(name, offset, name.range)?
+                identifier_at_offset(name, offset.to_u32(), name.range)?
             } else {
                 name.as_str()
             }
@@ -54,24 +55,27 @@ pub fn identifier_from_node<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option
         AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
             module: Some(module),
             ..
-        }) if module.range.contains(offset.into()) => {
-            identifier_at_offset(module, offset, module.range)?
+        }) if module.range.contains(offset) => {
+            identifier_at_offset(module, offset.to_u32(), module.range)?
         }
         AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, attr, .. }) => {
-            if attr.range().contains_inclusive(offset.into()) {
+            if attr.range().contains_inclusive(offset) {
                 return Some(attr);
             }
 
             find_attribute_name_at_offset(value, offset)
         }
+        AnyNodeRef::PatternMatchAs(python_ast::PatternMatchAs {
+            name: Some(name), ..
+        }) if name.range().contains_inclusive(offset) => name.as_str(),
         _ => return None,
     })
 }
 
-fn find_attribute_name_at_offset(expr: &Expr, offset: u32) -> &str {
+fn find_attribute_name_at_offset(expr: &Expr, offset: TextSize) -> &str {
     match expr {
         Expr::Attribute(python_ast::AttributeExpr { value, attr, .. }) => {
-            if attr.range().contains(offset.into()) {
+            if attr.range().contains(offset) {
                 attr
             } else {
                 find_attribute_name_at_offset(value, offset)
