@@ -48,6 +48,9 @@ You can install the VSCode extension manually with
 # First we need to build the extension package
 $ npm install -g @vscode/vsce
 $ cd sith-language-server/editors/vscode
+# Install dependencies
+$ npm install
+# Build the extension package
 $ vsce package
 # Now manually install the extension
 $ code --install-extension sith-language-server-0.1.0.vsix
@@ -82,6 +85,8 @@ vim.api.nvim_create_autocmd("FileType", {
 # Settings
 
 ### sith.executable
+
+**NOTE:** This setting is only valid in the VSCode extension.
 
 Path to the language server executable.
 
