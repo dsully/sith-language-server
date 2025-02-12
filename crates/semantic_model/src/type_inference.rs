@@ -187,12 +187,8 @@ impl ClassType {
     }
 
     pub fn node_stack<'db>(&self, db: &'db SymbolTableDb) -> NodeStack<'db> {
-        let suite = db
-            .indexer()
-            .ast(db.indexer().file_path(&self.file_id))
-            .map(|ast| ast.suite())
-            .expect("class AST nodes");
-        NodeStack::default().build(suite)
+        db.indexer()
+            .node_stack(db.indexer().file_path(&self.file_id))
     }
 
     pub fn class_bases(&self, db: &SymbolTableDb) -> Vec<ResolvedType> {
@@ -203,8 +199,7 @@ impl ClassType {
         let node_stack = if symbol.is_builtin() {
             db.builtin_symbols().node_stack()
         } else {
-            let suite = db.indexer().ast(path).unwrap().suite();
-            NodeStack::default().build(suite)
+            db.indexer().node_stack(path)
         };
 
         let node_with_parent = node_stack.nodes().get(declaration.node_id).unwrap();
@@ -782,8 +777,7 @@ impl<'db> TypeInferer<'db> {
                             .db
                             .symbol(path, declaration.symbol_id)
                             .definition_scope();
-                        let node_stack = NodeStack::default()
-                            .build(self.db.indexer().ast(path).unwrap().suite());
+                        let node_stack = self.db.indexer().node_stack(path);
                         let nodes = node_stack.nodes();
 
                         self.infer_in_scope(path, definition_scope, |this| {
@@ -792,8 +786,7 @@ impl<'db> TypeInferer<'db> {
                     }
                     ResolvedType::KnownType(PythonType::Module(file_id)) => {
                         let module_path = self.db.indexer().file_path(&file_id);
-                        let node_stack = NodeStack::default()
-                            .build(self.db.indexer().ast(module_path).unwrap().suite());
+                        let node_stack = self.db.indexer().node_stack(module_path);
                         let nodes = node_stack.nodes();
 
                         self.infer_in_file(module_path, |this| {
@@ -1017,8 +1010,7 @@ impl<'db> TypeInferer<'db> {
                     let file_id = self.db.indexer().file_id(source_path);
                     ResolvedType::KnownType(PythonType::Module(file_id))
                 } else {
-                    let ast = self.db.indexer().ast(source_path).unwrap();
-                    let node_stack = NodeStack::default().build(ast.suite());
+                    let node_stack = self.db.indexer().node_stack(source_path);
                     let nodes = node_stack.nodes();
 
                     self.infer_in_file(source_path, |this| {
@@ -1048,7 +1040,7 @@ impl<'db> TypeInferer<'db> {
             .symbol(self.path, declaration.symbol_id)
             .is_builtin()
         {
-            let node_stack = NodeStack::default().build(self.db.builtin_symbols().ast());
+            let node_stack = NodeStack::default().build(self.db.builtin_symbols().suite());
             let builtin_nodes = node_stack.nodes();
 
             return self.infer_in_file(self.db.builtin_symbols().path(), |this| {
@@ -1302,7 +1294,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use python_ast::{AnyNodeRef, Expr};
-    use python_ast_utils::nodes::NodeStack;
     use python_utils::{get_python_platform, get_python_search_paths, get_python_version};
     use ruff_text_size::Ranged;
 
@@ -1356,7 +1347,7 @@ mod tests {
             parent
         };
         let db = setup_db(src, root, &path);
-        let stack = NodeStack::default().build(db.indexer().ast(&path).unwrap().suite());
+        let stack = db.indexer().node_stack(&path);
 
         let reveal_type_func = stack.nodes().iter().find(|node_with_parent| {
             matches!(

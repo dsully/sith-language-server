@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use lsp_types::{self as types, request as req, Url};
 use python_ast::{AnyNodeRef, Arguments};
-use python_ast_utils::nodes::{NodeStack, Nodes};
+use python_ast_utils::nodes::Nodes;
 use python_ast_utils::{identifier_from_node, node_at_offset};
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
@@ -42,8 +42,7 @@ impl super::BackgroundDocumentRequestHandler for GotoDefinition {
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         let db = snapshot.db();
-        let ast = db.indexer().ast(&document_path).unwrap();
-        let node_stack = NodeStack::default().build(ast.suite());
+        let node_stack = db.indexer().node_stack(&document_path);
 
         let document = snapshot.document();
 

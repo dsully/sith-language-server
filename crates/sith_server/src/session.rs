@@ -106,6 +106,8 @@ impl Session {
         Ok(())
     }
 
+    // TODO: use this function when figure it out how to implement workspace/didChangeConfiguration
+    #[allow(dead_code)]
     pub(crate) fn update_workspace_settings(
         &mut self,
         url: &Url,

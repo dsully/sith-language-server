@@ -1,4 +1,3 @@
-use crate::server::api::LSPResult;
 use crate::server::client::Notifier;
 use crate::server::Result;
 use crate::session::Session;

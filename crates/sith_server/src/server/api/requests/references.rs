@@ -59,7 +59,7 @@ fn references(
     let index = document.index();
     let position = params.text_document_position.position;
     let offset = position_to_offset(document.contents(), &position, index);
-    let ast = db.indexer().ast(&current_file_path).unwrap();
+    let ast = db.indexer().ast(&current_file_path);
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;
@@ -202,7 +202,7 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
             })
         {
             let path = self.db.indexer().file_path(file_id);
-            let suite = self.db.indexer().ast(path).unwrap().suite();
+            let suite = self.db.indexer().ast(path).suite();
             let node_stack = NodeStack::default().build(suite);
             let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path);
             let references_visitor = ReferencesFinderVisitor::new(

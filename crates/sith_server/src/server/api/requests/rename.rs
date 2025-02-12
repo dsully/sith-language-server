@@ -44,7 +44,7 @@ fn rename(
     let index = document.index();
     let position = params.text_document_position.position;
     let offset = position_to_offset(document.contents(), &position, index);
-    let ast = db.indexer().ast(&current_file_path).unwrap();
+    let ast = db.indexer().ast(&current_file_path);
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;

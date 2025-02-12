@@ -1,13 +1,11 @@
-use std::path::PathBuf;
-
 use lsp_types::{self as types, request as req, HoverContents, MarkupContent, MarkupKind};
-use python_ast_utils::{node_at_offset, nodes::NodeStack};
+use python_ast_utils::node_at_offset;
 use python_utils::nodes::get_documentation_string_from_node;
 use semantic_model::type_inference::{PythonType, ResolvedType, TypeInferer};
 
 use crate::{
     edit::position_to_offset,
-    server::{api::LSPResult, client::Notifier, Result},
+    server::{client::Notifier, Result},
     session::DocumentSnapshot,
 };
 
@@ -27,36 +25,26 @@ impl super::BackgroundDocumentRequestHandler for Hover {
         _notifier: Notifier,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
-        let document_path = snapshot
-            .url()
-            .to_file_path()
-            .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-        Ok(hover(
-            &snapshot,
-            &document_path,
-            &params.text_document_position_params,
-        ))
+        Ok(hover(&snapshot, &params.text_document_position_params))
     }
 }
 
 // TODO: show variable type when hovering
 pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
-    document_path: &PathBuf,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
+    let document_path = snapshot.url().to_file_path().ok()?;
     let db = snapshot.db();
-    let ast = db.indexer().ast(document_path).unwrap();
-    let node_stack = NodeStack::default().build(ast.suite());
+    let node_stack = db.indexer().node_stack(&document_path);
     let nodes = node_stack.nodes();
 
     let document = snapshot.document();
     let position = position.position;
     let offset = position_to_offset(document.contents(), &position, document.index());
 
-    let (scope_id, _) = db.find_enclosing_scope(document_path, offset);
-    let mut type_inferer = TypeInferer::new(db, scope_id, document_path);
+    let (scope_id, _) = db.find_enclosing_scope(&document_path, offset);
+    let mut type_inferer = TypeInferer::new(db, scope_id, &document_path);
 
     let node = node_at_offset(nodes, offset)?;
     let (file_id, node_id) = match type_inferer.infer_node(node, nodes) {

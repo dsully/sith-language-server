@@ -37,7 +37,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         let offset = position_to_offset(document.contents(), &position, document.index());
         let (scope_id, _) = db.find_enclosing_scope(&current_file, offset);
 
-        let ast = db.indexer().ast(&current_file).unwrap();
+        let ast = db.indexer().ast(&current_file);
         let node_stack = NodeStack::default().build(ast.suite());
 
         let Some(symbol_node) = node_at_offset(node_stack.nodes(), offset) else {

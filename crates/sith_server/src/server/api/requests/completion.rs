@@ -8,7 +8,7 @@ use lsp_types::{
 use python_ast::{AnyNodeRef, Expr};
 use python_ast_utils::{
     node_at_offset, node_at_row,
-    nodes::{NodeId, NodeStack, Nodes},
+    nodes::{NodeId, Nodes},
 };
 use python_utils::get_python_module_names_in_path;
 use ruff_source_file::LineIndex;
@@ -631,9 +631,8 @@ fn get_completion_candidates(
             }
         }
         PositionCtx::Call { file_id, node_id } => {
-            let call_path = db.indexer().file_path(file_id);
-            let suite = db.indexer().ast(call_path).map(|ast| ast.suite()).unwrap();
-            let node_stack = NodeStack::default().build(suite);
+            let path = db.indexer().file_path(file_id);
+            let node_stack = db.indexer().node_stack(path);
             let Some(func_stmt) = node_stack
                 .nodes()
                 .get(*node_id)
@@ -748,8 +747,7 @@ impl super::BackgroundDocumentRequestHandler for Completion {
         let position = params.text_document_position.position;
         let offset = position_to_offset(document.contents(), &position, index);
 
-        let ast = db.indexer().ast(&path).unwrap();
-        let node_stack = NodeStack::default().build(ast.suite());
+        let node_stack = db.indexer().node_stack(&path);
 
         let (scope, _) = db.find_enclosing_scope(&path, offset);
         let pos_ctx = position_context(db, &path, scope, node_stack.nodes(), offset, index);

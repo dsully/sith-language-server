@@ -53,8 +53,11 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
             Some(CompletionItemDataPayload::Module(completion_item_module_data)) => {
                 // Check if the module was already indexed and get the first string expression
                 // statement. Otherwise, we need to read the file contents and parse it.
-                let ast = if let Some(ast) = db.indexer().ast(completion_item_module_data.path()) {
-                    ast
+                let ast = if db
+                    .indexer()
+                    .contains_path(completion_item_module_data.path())
+                {
+                    db.indexer().ast(completion_item_module_data.path())
                 } else {
                     let contents = fs::read_to_string(completion_item_module_data.path())
                         .expect("file to exist!");

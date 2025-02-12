@@ -110,30 +110,29 @@ impl Workspace {
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
 
-        let (python_search_paths, python_version) = if let Some(interpreter) =
-            resolved_settings.interpreter()
-        {
-            let python_search_paths = get_python_search_paths(interpreter)
-                .map_err(|err| {
-                    tracing::error!("{err}");
-                    show_err_msg!("{err}");
-                })
-                .map(|result| result.paths)
-                .unwrap_or_default();
-            let python_version = get_python_version(interpreter)
-                .map_err(|err| {
-                    tracing::error!("{err}");
-                    show_err_msg!("{err}");
-                })
-                .unwrap_or(PythonVersion::None);
-            (python_search_paths, python_version)
-        } else {
-            tracing::error!("Python interpreter path was not set in settings!");
-            show_err_msg!(
+        let (python_search_paths, python_version) =
+            if let Some(interpreter) = resolved_settings.interpreter() {
+                let python_search_paths = get_python_search_paths(interpreter)
+                    .map_err(|err| {
+                        tracing::error!("{err}");
+                        show_err_msg!("{err}");
+                    })
+                    .map(|result| result.paths)
+                    .unwrap_or_default();
+                let python_version = get_python_version(interpreter)
+                    .map_err(|err| {
+                        tracing::error!("{err}");
+                        show_err_msg!("{err}");
+                    })
+                    .unwrap_or(PythonVersion::None);
+                (python_search_paths, python_version)
+            } else {
+                tracing::error!("Python interpreter path was not set in settings!");
+                show_err_msg!(
                 "Python interpreter path was not set in settings! Functionality will be limited."
             );
-            (vec![], PythonVersion::None)
-        };
+                (vec![], PythonVersion::None)
+            };
 
         let python_platform = get_python_platform()?;
 
@@ -187,6 +186,8 @@ impl Workspaces {
         Ok(())
     }
 
+    // TODO: use this function when figure it out how to implement workspace/didChangeConfiguration
+    #[allow(dead_code)]
     pub(super) fn update_workspace_settings(
         &mut self,
         folder_url: &Url,

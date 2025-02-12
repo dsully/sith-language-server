@@ -6,7 +6,7 @@ use std::{
 };
 
 use bimap::BiHashMap;
-use python_ast::ModModule;
+use python_ast::{ModModule, Suite};
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -81,7 +81,7 @@ impl BuiltinSymbolTable {
         &self.path
     }
 
-    pub fn ast(&self) -> &Vec<python_ast::Stmt> {
+    pub fn suite(&self) -> &Suite {
         self.ast.suite()
     }
 
@@ -103,7 +103,7 @@ impl BuiltinSymbolTable {
     }
 
     pub fn node_stack(&self) -> NodeStack {
-        NodeStack::default().build(self.ast())
+        NodeStack::default().build(self.suite())
     }
 }
 
@@ -285,7 +285,7 @@ impl Indexer {
         self.config.typeshed_path.as_ref().unwrap()
     }
 
-    fn contains_path(&self, path: &PathBuf) -> bool {
+    pub fn contains_path(&self, path: &PathBuf) -> bool {
         self.files.contains_path(path)
     }
 
@@ -316,13 +316,15 @@ impl Indexer {
             .unwrap_or_else(|| panic!("no `file_id` for {}", file_path.display()))
     }
 
-    // TODO: remove Option type
-    pub fn ast(&self, file: &PathBuf) -> Option<&Parsed<ModModule>> {
-        self.asts.get(self.files.get_by_path(file)?)
+    pub fn ast(&self, file: &PathBuf) -> &Parsed<ModModule> {
+        self.files
+            .get_by_path(file)
+            .and_then(|file_id| self.asts.get(file_id))
+            .expect("AST for provided file")
     }
 
     pub fn node_stack(&self, file: &PathBuf) -> NodeStack {
-        let suite = self.ast(file).unwrap().suite();
+        let suite = self.ast(file).suite();
         NodeStack::default().build(suite)
     }
 

@@ -52,8 +52,7 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
     let document = snapshot.document();
     let ast = db
         .indexer()
-        .ast(&snapshot.url().to_file_path().expect("to be a filepath"))
-        .unwrap();
+        .ast(&snapshot.url().to_file_path().expect("to be a filepath"));
 
     ast.errors()
         .iter()
