@@ -501,11 +501,18 @@ where
                             }
                         };
 
-                    let (decl_id, _) = self.push_declaration(
-                        &name.name,
+                    let declaration_kind = if name.name.as_str() == "*" {
+                        DeclarationKind::Stmt(DeclStmt::ImportStar {
+                            source: resolved_path,
+                        })
+                    } else {
                         DeclarationKind::Stmt(DeclStmt::Import {
                             source: resolved_path,
-                        }),
+                        })
+                    };
+                    let (decl_id, _) = self.push_declaration(
+                        &name.name,
+                        declaration_kind,
                         name.range,
                         self.curr_node.unwrap(),
                     );

@@ -84,6 +84,7 @@ pub enum DeclStmt {
     TypeAlias,
     Assignment,
     Import { source: Option<PathBuf> },
+    ImportStar { source: Option<PathBuf> },
     ImportSegment { source: Option<PathBuf> },
     ImportAlias(DeclId),
     AnnAssign,
@@ -102,15 +103,21 @@ pub struct Declaration {
 impl Declaration {
     pub fn is_import(&self) -> bool {
         matches!(self.kind,
-            DeclarationKind::Stmt(DeclStmt::Import { .. }
-            | DeclStmt::ImportAlias(_)
-            | DeclStmt::ImportSegment { .. })
+            DeclarationKind::Stmt(
+                DeclStmt::Import { .. }
+                | DeclStmt::ImportAlias(_)
+                | DeclStmt::ImportSegment { .. }
+                | DeclStmt::ImportStar { .. }
+            )
         )
     }
 
     pub fn import_source(&self) -> Option<&PathBuf> {
-        let DeclarationKind::Stmt(DeclStmt::Import { source } | DeclStmt::ImportSegment { source }) =
-            &self.kind
+        let DeclarationKind::Stmt(
+            DeclStmt::Import { source }
+            | DeclStmt::ImportSegment { source }
+            | DeclStmt::ImportStar { source },
+        ) = &self.kind
         else {
             return None;
         };
@@ -133,6 +140,9 @@ impl Declaration {
                 }
                 | DeclStmt::ImportSegment {
                     source: Some(source),
+                } 
+                | DeclStmt::ImportStar {
+                    source: Some(source) 
                 },
             ) if is_python_module(symbol_name, source))
     }
