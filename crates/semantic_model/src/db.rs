@@ -97,9 +97,18 @@ impl BuiltinSymbolTable {
         self.table.scope(self.scope_id()).unwrap()
     }
 
+    pub fn lookup_symbol(&self, name: &str, scope_id: ScopeId) -> Option<&Symbol> {
+        self.table.lookup_symbol(name, scope_id).filter(|symbol| {
+            self.table
+                .declaration(symbol.declarations().last())
+                .is_some_and(|declaration| !declaration.is_import())
+        })
+    }
+
     pub fn symbol_declaration(&self, name: &str) -> Option<&Declaration> {
         self.table
             .symbol_declaration(name, self.scope_id(), DeclarationQuery::Last)
+            .filter(|&declaration| !declaration.is_import())
     }
 
     pub fn node_stack(&self) -> NodeStack {

@@ -100,6 +100,14 @@ pub struct Declaration {
 }
 
 impl Declaration {
+    pub fn is_import(&self) -> bool {
+        matches!(self.kind,
+            DeclarationKind::Stmt(DeclStmt::Import { .. }
+            | DeclStmt::ImportAlias(_)
+            | DeclStmt::ImportSegment { .. })
+        )
+    }
+
     pub fn import_source(&self) -> Option<&PathBuf> {
         let DeclarationKind::Stmt(DeclStmt::Import { source } | DeclStmt::ImportSegment { source }) =
             &self.kind
@@ -130,6 +138,7 @@ impl Declaration {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum DeclarationQuery {
     /// Get the first declaration made.
     First,
