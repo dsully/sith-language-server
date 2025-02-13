@@ -244,7 +244,11 @@ impl<'a> SymbolTableBuilder<'a> {
             let declaration = self.table.decls.get(decl_id).unwrap();
             if matches!(
                 declaration.kind,
-                DeclarationKind::Stmt(DeclStmt::Import { .. } | DeclStmt::ImportAlias(_))
+                DeclarationKind::Stmt(
+                    DeclStmt::Import { .. }
+                        | DeclStmt::ImportSegment { .. }
+                        | DeclStmt::ImportAlias(_)
+                )
             ) {
                 return (decl_id, symbol_id);
             }
