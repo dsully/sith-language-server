@@ -22,23 +22,28 @@ An experimental Python language server.
 
 # How to use
 
+You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
+build it manually following the steps bellow.
+
+### Building the project
+
 Download the repository with
 
 ```sh
 $ git clone https://github.com/LaBatata101/sith-language-server
 ```
 
-now build it (you'll need the latest version of the Rust compiler)
+now build the SithLSP binary (you'll need the latest version of the Rust compiler).
 
 ```sh
 $ cd sith-language-server
 $ cargo build --release
 ```
 
-the binary will be located at `target/release`. You should put the binary in `$PATH` or
-set the binary location in the SithLSP configuration option.
+The binary will be located in the `target/release` folder. You should place the binary in `$PATH` or,
+if you're using VSCode, you can use the `sith.executable` setting option.
 
-## Installing the VSCode extension
+### Installing the VSCode extension
 
 It's probably better to disable the `Python` or `Pylance` extensions, from Microsoft, to avoid any conflicts.
 
@@ -56,7 +61,7 @@ $ vsce package
 $ code --install-extension sith-language-server-0.1.0.vsix
 ```
 
-## Neovim
+### Neovim Configuration
 
 Add this to your `init.lua` config file.
 
