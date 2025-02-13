@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 
-def find_ruff_binary_path(exe_name: str) -> Optional[Path]:
+def find_binary_path(exe_name: str) -> Optional[Path]:
     """Return the ruff binary path if it exists, `None` otherwise."""
     bin_path = Path(sysconfig.get_path("scripts")) / exe_name
     if bin_path.is_file():
@@ -39,6 +39,6 @@ if __name__ == "__main__":
         print("missing binary name argument in script", file=sys.stderr, flush=True)
         sys.exit(1)
 
-    ruff_binary_path = find_ruff_binary_path(sys.argv[1])
+    ruff_binary_path = find_binary_path(sys.argv[1])
     if ruff_binary_path:
         print(ruff_binary_path, flush=True)
