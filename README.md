@@ -3,9 +3,22 @@
 > [!WARNING]
 > THIS SOFTWARE IS IN ALPHA STATE EXPECT BUGS, BREAKING CHANGES, CRASHES, EXPLOSIONS AND EVERYTHING IN BETWEEN!
 
-An experimental Python language server.
+An experimental language server for the Python programming language.
 
-# LSP methods implemented so far
+## Features
+
+- 🪲 Syntax checking
+- ↪ Go to definition
+- 🔍 Find references
+- 🖊️ Autocompletion
+- 📝 Element renaming
+- 🗨️ Hover to view details on variables, functions, and more (_can only show documentation for now_)
+- 💅 Code formatting and linting powered by [Ruff](https://github.com/astral-sh/ruff)
+- 💡 Highlighting of symbol references
+- ... and many more to come, stay tuned!
+
+<details>
+<summary>LSP methods implemented so far</summary>
 
 - textDocument/completion
 - textDocument/publishDiagnostics
@@ -19,8 +32,11 @@ An experimental Python language server.
 - textDocument/rename
 - textDocument/prepareRename
 - workspace/didChangeWorkspaceFolders
+- completionItem/resolve
 
-# How to use
+</details>
+
+## How to use
 
 You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
 build it manually following the steps bellow.
