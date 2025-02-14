@@ -7,10 +7,12 @@ use python_ast_utils::nodes::NodeId;
 use python_utils::is_python_module;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_text_size::TextRange;
+use serde::{Deserialize, Serialize};
 
 use crate::{db::FileId, symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
 
 #[newtype_index]
+#[derive(Serialize, Deserialize)]
 pub struct DeclId;
 
 #[derive(Debug, Default, Clone)]

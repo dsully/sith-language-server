@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 use semantic_model::{
     builtins::BUILTIN_KEYWORDS,
     db::{FileId, SymbolTableDb},
-    declaration::{DeclStmt, Declaration, DeclarationKind, DeclarationQuery},
+    declaration::{DeclId, DeclStmt, DeclarationKind, DeclarationQuery},
     type_inference::{PythonType, ResolvedType, TypeInferer},
     Scope, ScopeId, Symbol,
 };
@@ -73,7 +73,7 @@ impl CompletionItemData {
 #[derive(Debug, Serialize, Deserialize)]
 struct CompletionItemSymbolData {
     file_id: FileId,
-    node_id: NodeId,
+    declaration_id: DeclId,
     is_builtin: bool,
 }
 
@@ -82,8 +82,8 @@ impl CompletionItemSymbolData {
         self.file_id
     }
 
-    fn node_id(&self) -> NodeId {
-        self.node_id
+    fn declaration_id(&self) -> DeclId {
+        self.declaration_id
     }
 }
 
@@ -104,6 +104,7 @@ enum CompletionItemDataPayload {
     Symbol(CompletionItemSymbolData),
 }
 
+#[derive(Debug)]
 struct CompletionItemCandidate {
     label: String,
     kind: CompletionItemKind,
@@ -111,15 +112,20 @@ struct CompletionItemCandidate {
 }
 
 impl CompletionItemCandidate {
-    fn builtin(name: String, kind: CompletionItemKind, declaration: &Declaration) -> Self {
+    fn builtin(
+        name: String,
+        kind: CompletionItemKind,
+        file_id: FileId,
+        declaration_id: DeclId,
+    ) -> Self {
         Self {
             label: name,
             kind,
             data: Some(CompletionItemDataPayload::Symbol(
                 CompletionItemSymbolData {
-                    node_id: declaration.node_id,
-                    file_id: declaration.file_id,
                     is_builtin: true,
+                    file_id,
+                    declaration_id,
                 },
             )),
         }
@@ -378,19 +384,18 @@ fn get_completion_candidates_from_scope<'a>(
     scope: &'a Scope,
 ) -> impl Iterator<Item = CompletionItemCandidate> + use<'a> {
     // TODO: handle multiple symbol declarations
+    let file_id = db.indexer().file_id(path);
     scope
         .symbols()
         .map(|(symbol_name, symbol_id)| (symbol_name, db.symbol(path, *symbol_id)))
-        .filter_map(|(symbol_name, symbol)| {
-            let declaration =
-                db.resolve_declaration(path, symbol.declarations().last(), symbol_name)?;
+        .filter_map(move |(symbol_name, symbol)| {
             get_completion_item_kind(db, path, symbol).map(|kind| CompletionItemCandidate {
                 label: symbol_name.to_string(),
                 kind,
                 data: Some(CompletionItemDataPayload::Symbol(
                     CompletionItemSymbolData {
-                        file_id: declaration.file_id,
-                        node_id: declaration.node_id,
+                        file_id,
+                        declaration_id: symbol.declarations().last(),
                         is_builtin: false,
                     },
                 )),
@@ -437,6 +442,7 @@ fn get_python_module_candidates(path: impl AsRef<Path>) -> Vec<CompletionItemCan
 fn builtin_completion_candidates(
     db: &SymbolTableDb,
 ) -> impl Iterator<Item = CompletionItemCandidate> + use<'_> {
+    let file_id = db.indexer().file_id(db.builtin_symbols().path());
     db.builtin_symbols()
         .scope()
         .symbols()
@@ -444,21 +450,19 @@ fn builtin_completion_candidates(
             (symbol_name, db.builtin_symbols().symbol(symbol_id).unwrap())
         })
         .filter(|(_, symbol)| !symbol.is_private())
-        .filter_map(|(symbol_name, symbol)| {
+        .filter_map(move |(symbol_name, symbol)| {
             // TODO: handle symbol with multiple declarations
-            let decl_id = symbol.declarations().last();
-            let declaration = db.builtin_symbols().declaration(decl_id).unwrap();
+            let declaration_id = symbol.declarations().last();
+            let declaration = db.builtin_symbols().declaration(declaration_id).unwrap();
 
             // don't show imported symbols from the builtin.pyi file
-            if !matches!(
-                declaration.kind,
-                DeclarationKind::Stmt(DeclStmt::Import { .. } | DeclStmt::ImportAlias(_))
-            ) {
+            if declaration.is_import() {
                 get_completion_item_kind(db, db.builtin_symbols().path(), symbol).map(|item_kind| {
                     CompletionItemCandidate::builtin(
                         symbol_name.to_string(),
                         item_kind,
-                        declaration,
+                        file_id,
+                        declaration_id,
                     )
                 })
             } else {
@@ -686,11 +690,11 @@ fn get_completion_candidates(
                     process_base_classes(db, &class.class_bases(db), &mut completion_candidates);
                 }
                 ResolvedType::KnownType(PythonType::Module(file_id)) => {
-                    let path = db.indexer().file_path(&file_id);
-                    let scope = db.scope(path, ScopeId::global());
+                    let module_path = db.indexer().file_path(&file_id);
+                    let scope = db.scope(module_path, ScopeId::global());
 
                     completion_candidates =
-                        get_completion_candidates_from_scope(db, path, scope).collect();
+                        get_completion_candidates_from_scope(db, module_path, scope).collect();
                 }
                 _ => return None,
             }

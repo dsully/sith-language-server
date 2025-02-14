@@ -70,18 +70,24 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
                     .map(|str_expr| str_expr.value.to_string())
             }
             Some(CompletionItemDataPayload::Symbol(completion_item_symbol_data)) => {
-                let node_stack = if completion_item_symbol_data.is_builtin {
-                    db.builtin_symbols().node_stack()
+                let (node_stack, declaration) = if completion_item_symbol_data.is_builtin {
+                    (
+                        db.builtin_symbols().node_stack(),
+                        db.builtin_symbols()
+                            .declaration(completion_item_symbol_data.declaration_id())
+                            .expect("builtin symbol declaration"),
+                    )
                 } else {
                     let path = db
                         .indexer()
                         .file_path(&completion_item_symbol_data.file_id());
-                    db.indexer().node_stack(path)
+                    (
+                        db.indexer().node_stack(path),
+                        db.declaration(path, completion_item_symbol_data.declaration_id()),
+                    )
                 };
-                let completion_item_node = node_stack
-                    .nodes()
-                    .get(completion_item_symbol_data.node_id())
-                    .unwrap();
+
+                let completion_item_node = node_stack.nodes().get(declaration.node_id).unwrap();
 
                 get_documentation_string_from_node(completion_item_node)
             }

@@ -476,35 +476,6 @@ impl SymbolTableDb {
             .expect("expect declaration for id")
     }
 
-    pub fn resolve_declaration(
-        &self,
-        file: &PathBuf,
-        decl_id: DeclId,
-        symbol_name: &str,
-    ) -> Option<&Declaration> {
-        let mut declaration = self.declaration(file, decl_id);
-        while matches!(
-            declaration.kind,
-            DeclarationKind::Stmt(DeclStmt::Import { .. } | DeclStmt::ImportAlias(_))
-        ) {
-            declaration = match &declaration.kind {
-                DeclarationKind::Stmt(DeclStmt::Import {
-                    source: Some(source),
-                }) => self.symbol_declaration(
-                    source,
-                    symbol_name,
-                    ScopeId::global(),
-                    DeclarationQuery::Last,
-                )?,
-                DeclarationKind::Stmt(DeclStmt::ImportAlias(decl_id)) => {
-                    self.declaration(file, *decl_id)
-                }
-                _ => unreachable!(),
-            };
-        }
-        Some(declaration)
-    }
-
     pub fn symbol_declaration(
         &self,
         file: &PathBuf,
