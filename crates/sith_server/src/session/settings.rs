@@ -190,17 +190,17 @@ impl ResolvedClientSettings {
     }
 
     fn new_impl(all_settings: &[&ClientSettings]) -> Self {
+        let ruff_path = Self::resolve_optional(all_settings, |settings| {
+            settings.ruff.as_ref()?.path.clone()
+        });
         Self {
             interpreter: Self::resolve_optional(all_settings, |settings| {
                 settings.interpreter.clone()
             }),
-            ruff_path: Self::resolve_optional(all_settings, |settings| {
-                settings.ruff.as_ref()?.path.clone()
-            }),
             format_enable: Self::resolve_or(
                 all_settings,
                 |settings| settings.ruff.as_ref()?.format.as_ref()?.enable,
-                true,
+                ruff_path.is_some(),
             ),
             format_args: Self::resolve_or(
                 all_settings,
@@ -210,7 +210,7 @@ impl ResolvedClientSettings {
             lint_enable: Self::resolve_or(
                 all_settings,
                 |settings| settings.ruff.as_ref()?.lint.as_ref()?.enable,
-                true,
+                ruff_path.is_some(),
             ),
             lint_select: Self::resolve_optional(all_settings, |settings| {
                 settings.ruff.as_ref()?.lint.as_ref()?.select.clone()
@@ -226,6 +226,7 @@ impl ResolvedClientSettings {
                 |settings| settings.ruff.as_ref()?.lint.as_ref()?.args.clone(),
                 Vec::new(),
             ),
+            ruff_path,
         }
     }
 
