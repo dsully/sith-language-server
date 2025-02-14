@@ -83,9 +83,18 @@ pub enum DeclStmt {
     Class(ScopeId),
     TypeAlias,
     Assignment,
-    Import { source: Option<PathBuf> },
-    ImportStar { source: Option<PathBuf> },
-    ImportSegment { source: Option<PathBuf> },
+    Import {
+        stub_source: Option<PathBuf>,
+        non_stub_source: Option<PathBuf>,
+    },
+    ImportStar {
+        stub_source: Option<PathBuf>,
+        non_stub_source: Option<PathBuf>,
+    },
+    ImportSegment {
+        stub_source: Option<PathBuf>,
+        non_stub_source: Option<PathBuf>,
+    },
     ImportAlias(DeclId),
     AnnAssign,
     AugAssign,
@@ -102,26 +111,37 @@ pub struct Declaration {
 
 impl Declaration {
     pub fn is_import(&self) -> bool {
-        matches!(self.kind,
+        matches!(
+            self.kind,
             DeclarationKind::Stmt(
                 DeclStmt::Import { .. }
-                | DeclStmt::ImportAlias(_)
-                | DeclStmt::ImportSegment { .. }
-                | DeclStmt::ImportStar { .. }
+                    | DeclStmt::ImportAlias(_)
+                    | DeclStmt::ImportSegment { .. }
+                    | DeclStmt::ImportStar { .. }
             )
         )
     }
 
+    /// Returns the path to the source file for import-related declarations,
+    /// with preference given to stub sources over non-stub sources when available.
     pub fn import_source(&self) -> Option<&PathBuf> {
-        let DeclarationKind::Stmt(
-            DeclStmt::Import { source }
-            | DeclStmt::ImportSegment { source }
-            | DeclStmt::ImportStar { source },
-        ) = &self.kind
-        else {
-            return None;
-        };
-        source.as_ref()
+        match &self.kind {
+            DeclarationKind::Stmt(
+                DeclStmt::Import {
+                    stub_source,
+                    non_stub_source,
+                }
+                | DeclStmt::ImportSegment {
+                    stub_source,
+                    non_stub_source,
+                }
+                | DeclStmt::ImportStar {
+                    stub_source,
+                    non_stub_source,
+                },
+            ) => stub_source.as_ref().or(non_stub_source.as_ref()),
+            _ => None,
+        }
     }
 
     pub fn body_scope(&self) -> Option<ScopeId> {
@@ -134,17 +154,37 @@ impl Declaration {
     }
 
     pub fn is_imported_module(&self, symbol_name: &str) -> bool {
-        matches!(&self.kind, DeclarationKind::Stmt(
+        match &self.kind {
+            DeclarationKind::Stmt(
                 DeclStmt::Import {
-                    source: Some(source),
+                    stub_source: Some(stub_source),
+                    non_stub_source: None,
                 }
                 | DeclStmt::ImportSegment {
-                    source: Some(source),
-                } 
+                    stub_source: Some(stub_source),
+                    non_stub_source: None,
+                }
                 | DeclStmt::ImportStar {
-                    source: Some(source) 
+                    stub_source: Some(stub_source),
+                    non_stub_source: None,
                 },
-            ) if is_python_module(symbol_name, source))
+            ) => is_python_module(symbol_name, stub_source),
+            DeclarationKind::Stmt(
+                DeclStmt::Import {
+                    stub_source: None,
+                    non_stub_source: Some(non_stub_source),
+                }
+                | DeclStmt::ImportSegment {
+                    stub_source: None,
+                    non_stub_source: Some(non_stub_source),
+                }
+                | DeclStmt::ImportStar {
+                    stub_source: None,
+                    non_stub_source: Some(non_stub_source),
+                },
+            ) => is_python_module(symbol_name, non_stub_source),
+            _ => false,
+        }
     }
 }
 

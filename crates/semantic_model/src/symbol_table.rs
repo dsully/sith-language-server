@@ -437,19 +437,33 @@ where
                         .filter(|part| !part.is_empty())
                         .enumerate()
                     {
-                        let resolved_path = if import_result.is_import_found {
-                            let path = import_result.resolved_paths.get(i);
+                        let (stub_resolved_path, non_stub_resolved_path) =
+                            if import_result.is_import_found {
+                                let path = import_result.resolved_paths.get(i);
 
-                            // If the `path` is empty, we have a namespace package. So, we're going
-                            // to use the `package_directory` path instead.
-                            if path.is_some_and(|p| p.to_string_lossy().is_empty()) {
-                                import_result.package_directory.clone()
+                                // If the `path` is a empty path, we have a namespace package. So, we're going
+                                // to use the `package_directory` path instead.
+                                let resolved_path =
+                                    if path.is_some_and(|p| p.to_string_lossy().is_empty()) {
+                                        import_result.package_directory.clone()
+                                    } else {
+                                        path.cloned()
+                                    };
+
+                                if import_result.is_stub_file {
+                                    let non_stub_resolved_path = import_result
+                                        .non_stub_import_result
+                                        .as_ref()
+                                        .and_then(|non_stub_import_result| {
+                                            non_stub_import_result.resolved_paths.get(i)
+                                        });
+                                    (resolved_path, non_stub_resolved_path.cloned())
+                                } else {
+                                    (None, resolved_path)
+                                }
                             } else {
-                                path.cloned()
-                            }
-                        } else {
-                            None
-                        };
+                                (None, None)
+                            };
                         let segment_range =
                             module.range.add_start(prev_segment_len.into()).sub_end(
                                 segment
@@ -460,7 +474,8 @@ where
                         self.push_declaration(
                             segment,
                             DeclarationKind::Stmt(DeclStmt::ImportSegment {
-                                source: resolved_path,
+                                stub_source: stub_resolved_path,
+                                non_stub_source: non_stub_resolved_path,
                             }),
                             segment_range,
                             node_id,
@@ -471,7 +486,7 @@ where
 
                 for name in &import_from.names {
                     self.push_node(name);
-                    let resolved_path =
+                    let (stub_resolved_path, non_stub_resolved_path) =
                         if let Some(implicit_import) =
                             // First, check if the name exists directly in implicit imports. If not found,
                             // check if it's a package by looking for an "__init__.py" file.
@@ -486,7 +501,11 @@ where
                                         .get(&format!("{}/__init__.py", &name.name))
                                 })
                         {
-                            Some(implicit_import.path.clone())
+                            if implicit_import.is_stub_file {
+                                (Some(implicit_import.path.clone()), None)
+                            } else {
+                                (None, Some(implicit_import.path.clone()))
+                            }
                         } else {
                             // If the `path` is empty, we have a namespace package. If the import name
                             // isn't found in the implicit imports we return `None`.
@@ -495,19 +514,32 @@ where
                                 .last()
                                 .is_some_and(|p| p.to_string_lossy().is_empty())
                             {
-                                None
+                                (None, None)
+                            } else if import_result.is_stub_file {
+                                let non_stub_resolved_path = import_result
+                                    .non_stub_import_result
+                                    .as_ref()
+                                    .and_then(|non_stub_import_result| {
+                                        non_stub_import_result.resolved_paths.last().cloned()
+                                    });
+                                (
+                                    import_result.resolved_paths.last().cloned(),
+                                    non_stub_resolved_path,
+                                )
                             } else {
-                                import_result.resolved_paths.last().cloned()
+                                (None, import_result.resolved_paths.last().cloned())
                             }
                         };
 
                     let declaration_kind = if name.name.as_str() == "*" {
                         DeclarationKind::Stmt(DeclStmt::ImportStar {
-                            source: resolved_path,
+                            stub_source: stub_resolved_path,
+                            non_stub_source: non_stub_resolved_path,
                         })
                     } else {
                         DeclarationKind::Stmt(DeclStmt::Import {
-                            source: resolved_path,
+                            stub_source: stub_resolved_path,
+                            non_stub_source: non_stub_resolved_path,
                         })
                     };
                     let (decl_id, _) = self.push_declaration(
@@ -550,19 +582,33 @@ where
                     {
                         let is_first_segment = i == 0;
 
-                        let resolved_path = if import_result.is_import_found {
-                            let path = import_result.resolved_paths.get(i);
+                        let (stub_resolved_path, non_stub_resolved_path) =
+                            if import_result.is_import_found {
+                                let path = import_result.resolved_paths.get(i);
 
-                            // If the `path` is empty, we have a namespace package. So, we're going
-                            // to use the `package_directory` path instead.
-                            if path.is_some_and(|p| p.to_string_lossy().is_empty()) {
-                                import_result.package_directory.clone()
+                                // If the `path` is a empty path, we have a namespace package. So, we're going
+                                // to use the `package_directory` path instead.
+                                let resolved_path =
+                                    if path.is_some_and(|p| p.to_string_lossy().is_empty()) {
+                                        import_result.package_directory.clone()
+                                    } else {
+                                        path.cloned()
+                                    };
+
+                                if import_result.is_stub_file {
+                                    let non_stub_resolved_path = import_result
+                                        .non_stub_import_result
+                                        .as_ref()
+                                        .and_then(|non_stub_import_result| {
+                                            non_stub_import_result.resolved_paths.get(i)
+                                        });
+                                    (resolved_path, non_stub_resolved_path.cloned())
+                                } else {
+                                    (None, resolved_path)
+                                }
                             } else {
-                                path.cloned()
-                            }
-                        } else {
-                            None
-                        };
+                                (None, None)
+                            };
 
                         let segment_range = name.range.add_start(prev_segment_len.into()).sub_end(
                             segment
@@ -574,11 +620,13 @@ where
                             segment,
                             if is_first_segment {
                                 DeclarationKind::Stmt(DeclStmt::Import {
-                                    source: resolved_path,
+                                    stub_source: stub_resolved_path,
+                                    non_stub_source: non_stub_resolved_path,
                                 })
                             } else {
                                 DeclarationKind::Stmt(DeclStmt::ImportSegment {
-                                    source: resolved_path,
+                                    stub_source: stub_resolved_path,
+                                    non_stub_source: non_stub_resolved_path,
                                 })
                             },
                             segment_range,

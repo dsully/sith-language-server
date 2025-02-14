@@ -234,10 +234,7 @@ impl Indexer {
             .declarations()
             .filter(|decl| matches!(decl.kind, DeclarationKind::Stmt(DeclStmt::Import { .. })))
         {
-            let DeclarationKind::Stmt(DeclStmt::Import { source }) = &import_decl.kind else {
-                unreachable!()
-            };
-            if let Some(source) = source {
+            if let Some(source) = import_decl.import_source() {
                 import_paths.push(source.clone());
             }
         }
