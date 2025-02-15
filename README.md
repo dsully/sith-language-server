@@ -72,6 +72,7 @@ $ cd sith-language-server/editors/vscode
 # Install dependencies
 $ npm install
 # Build the extension package
+$ npm run compile
 $ vsce package
 # Now manually install the extension
 $ code --install-extension sith-language-server-0.1.0.vsix
