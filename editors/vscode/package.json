@@ -147,17 +147,17 @@
         }
     },
     "scripts": {
-        "compile": "npm run check-types && node esbuild.js --production",
+        "compile": "npm run check-types && npm run esbuild-bundle",
+        "esbuild-bundle": "esbuild --bundle ./src/extension.ts --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
         "check-types": "tsc --noEmit",
         "watch": "npm-run-all -p watch:*",
-        "watch:esbuild": "node esbuild.js --watch",
+        "watch:esbuild": "rm -rf dist && tsc -b -w",
         "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
         "package": "vsce package"
     },
     "devDependencies": {
         "@electron/rebuild": "^3.6.0",
         "@types/fs-extra": "^11.0.4",
-        "@types/glob": "^8.1.0",
         "@types/mocha": "^8.0.0",
         "@types/node": "^20.3.1",
         "@types/vscode": "^1.44.0",

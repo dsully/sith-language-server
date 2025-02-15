@@ -26,6 +26,7 @@ jobs:
             - name: Build VSCode extension
               working-directory: editors/vscode
               run: |
+                  npm run compile
                   npx vsce package
 
             - name: Upload extension asset
