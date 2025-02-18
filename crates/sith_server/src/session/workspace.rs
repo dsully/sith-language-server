@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context};
 use lsp_types::Url;
+use python_utils::interpreter::{self, resolve_python_interpreter};
 use python_utils::{get_python_platform, get_python_search_paths, get_python_version};
 use ruff_python_resolver::python_platform::PythonPlatform;
 use ruff_python_resolver::python_version::PythonVersion;
@@ -104,44 +105,48 @@ impl Workspace {
         settings: ClientSettings,
         global_settings: &ClientSettings,
     ) -> crate::Result<(PathBuf, Self)> {
-        let path = root
+        let root_path = root
             .to_file_path()
             .map_err(|_| anyhow!("workspace URL was not a file path!"))?;
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
 
-        let (python_search_paths, python_version) =
-            if let Some(interpreter) = resolved_settings.interpreter() {
-                let python_search_paths = get_python_search_paths(interpreter)
-                    .map_err(|err| {
-                        tracing::error!("{err}");
-                        show_err_msg!("{err}");
-                    })
-                    .map(|result| result.paths)
-                    .unwrap_or_default();
-                let python_version = get_python_version(interpreter)
-                    .map_err(|err| {
-                        tracing::error!("{err}");
-                        show_err_msg!("{err}");
-                    })
-                    .unwrap_or(PythonVersion::None);
-                (python_search_paths, python_version)
-            } else {
-                tracing::error!("Python interpreter path was not set in settings!");
-                show_err_msg!(
-                "Python interpreter path was not set in settings! Functionality will be limited."
+        let (python_search_paths, python_version) = if let Some(interpreter) = resolved_settings
+            .interpreter()
+            .filter(|interpreter| !interpreter.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| resolve_python_interpreter(&root_path))
+        {
+            let python_search_paths = get_python_search_paths(&interpreter)
+                .map_err(|err| {
+                    tracing::error!("{err}");
+                    show_err_msg!("{err}");
+                })
+                .map(|result| result.paths)
+                .unwrap_or_default();
+            let python_version = get_python_version(&interpreter)
+                .map_err(|err| {
+                    tracing::error!("{err}");
+                    show_err_msg!("{err}");
+                })
+                .unwrap_or(PythonVersion::None);
+            (python_search_paths, python_version)
+        } else {
+            tracing::error!("Python interpreter path was not set in settings and SithLSP failed to find a suitable python interpreter in the system!");
+            show_err_msg!(
+                "Python interpreter path was not set in settings and SithLSP failed to find a suitable python interpreter in the system! Functionality will be limited."
             );
-                (vec![], PythonVersion::None)
-            };
+            (vec![], PythonVersion::None)
+        };
 
         let python_platform = get_python_platform()?;
 
         Ok((
-            path.clone(),
+            root_path.clone(),
             Self {
                 open_documents: OpenDocuments::default(),
                 symbol_table_db: SymbolTableDbController::new(
-                    path,
+                    root_path,
                     python_version,
                     python_platform,
                     python_search_paths,

@@ -75,6 +75,11 @@ path-slash = { version = "0.2.1" }
 directories = "5.0.1"
 indexmap = "2.7.0"
 bimap = "0.6.3"
+dirs = "6.0.0"
+toml = "0.8.20"
+base64 = "0.22.1"
+sha2 = "0.10.8"
+regex = "1.11.1"
 
 [dev-dependencies]
 insta = { version = "1.31.0", features = ["yaml"] }

@@ -7,6 +7,7 @@ use std::{
 use ruff_python_resolver::{python_platform::PythonPlatform, python_version::PythonVersion};
 use serde::{Deserialize, Serialize};
 
+pub mod interpreter;
 pub mod nodes;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -36,7 +37,11 @@ pub fn get_python_version(interpreter_path: impl AsRef<Path>) -> anyhow::Result<
         .get(1)
         .ok_or_else(|| anyhow::anyhow!("Incorrect Python version output!"))?;
 
-    let version_segments = version_output.split(".").collect::<Vec<_>>();
+    parse_python_version(version_output)
+}
+
+pub(crate) fn parse_python_version(version_str: &str) -> anyhow::Result<PythonVersion> {
+    let version_segments = version_str.split(".").collect::<Vec<_>>();
     let [major, minor, ..] = version_segments.as_slice() else {
         return Err(anyhow::anyhow!("Incorrect Python version format!"));
     };
