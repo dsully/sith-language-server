@@ -15,6 +15,7 @@ An experimental language server for the Python programming language.
 - 🗨️ Hover to view details on variables, functions, and more (_can only show documentation for now_)
 - 💅 Code formatting and linting powered by [Ruff](https://github.com/astral-sh/ruff)
 - 💡 Highlighting of symbol references
+- 🐍 Automatically detect the Python interpreter being used by your project
 - ... and many more to come, stay tuned!
 
 <details>
@@ -141,6 +142,7 @@ Path to the log file for the language server.
 ### sith.interpreter
 
 Path to a Python interpreter to use to run the LSP server.
+If this setting is set `sith` won't search automatically for a Python interpreter.
 
 - type: `string`
 - default: `null`
