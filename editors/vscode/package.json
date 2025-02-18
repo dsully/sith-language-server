@@ -150,9 +150,7 @@
         "compile": "npm run check-types && npm run esbuild-bundle",
         "esbuild-bundle": "esbuild --bundle ./src/extension.ts --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
         "check-types": "tsc --noEmit",
-        "watch": "npm-run-all -p watch:*",
-        "watch:esbuild": "rm -rf dist && tsc -b -w",
-        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "watch": "rm -rf dist && tsc -b -w",
         "package": "vsce package"
     },
     "devDependencies": {
