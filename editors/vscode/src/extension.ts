@@ -77,46 +77,19 @@ let _disposables: Disposable[] = [];
 async function startServer() {
     logger.info("Server started");
 
-      // Create output channels for the server and trace logs
-  const outputChannel = vscode.window.createOutputChannel(`Sith Language Server`);
-  _disposables.push(outputChannel);
-  const traceOutputChannel = new LazyOutputChannel(`Sith Language Server Trace`);
-  _disposables.push(traceOutputChannel);
-  // And, a command to show the server logs
-  _disposables.push(registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()));
+    // Create output channels for the server and trace logs
+    const outputChannel = vscode.window.createOutputChannel(`Sith Language Server`);
+    _disposables.push(outputChannel);
+    const traceOutputChannel = new LazyOutputChannel(`Sith Language Server Trace`);
+    _disposables.push(traceOutputChannel);
+    // And, a command to show the server logs
+    _disposables.push(registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()));
 
     const extensionSettings = getExtensionSettings(serverId);
     const globalSettings = getGlobalSettings(serverId);
 
     const projectRoot = await getProjectRoot();
     const workspaceSettings = await getWorkspaceSettings(serverId, projectRoot);
-    if (!workspaceSettings.interpreter) {
-        logger.error("Python interpreter not found!");
-        vscode.window
-            .showErrorMessage(
-                `Please set a Python interpreter using "${serverId}.interpreter" setting.`,
-                "Open Settings",
-            )
-            .then((selection) => {
-                if (selection === "Open Settings") {
-                    vscode.commands.executeCommand(
-                        "workbench.action.openSettings",
-                        "sith.interpreter",
-                    );
-                }
-            });
-        return;
-    }
-
-    logger.trace(`Using Python interpreter: ${workspaceSettings.interpreter}`);
-
-    if (!fs.statSync(globalSettings.interpreter).isFile()) {
-        logger.error("Python interpreter not found.");
-        vscode.window.showErrorMessage(
-            `Python interpreter not found in path: ${workspaceSettings.interpreter}`,
-        );
-        return;
-    }
 
     let command: string;
     if (process.env.DEV_MODE === "true") {
@@ -169,6 +142,6 @@ async function stopServer() {
 }
 
 function dispose(): void {
-  _disposables.forEach((d) => d.dispose());
-  _disposables = [];
+    _disposables.forEach((d) => d.dispose());
+    _disposables = [];
 }

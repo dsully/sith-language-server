@@ -93,7 +93,7 @@ export function getGlobalSettings(namespace: string): ISettings {
     return {
         workspace: process.cwd(),
         executable: getGlobalValue<string>(config, "executable", "sith-lsp"),
-        interpreter: getGlobalValue<string>(config, "interpreter", ""),
+        interpreter: getOptionalGlobalValue<string>(config, "interpreter"),
         ruff: {
             path: config.get<string>("ruff.path"),
             format: {
