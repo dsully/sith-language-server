@@ -54,20 +54,50 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
         .indexer()
         .ast(&snapshot.url().to_file_path().expect("to be a filepath"));
 
-    ast.errors()
-        .iter()
-        .map(|syntax_error| Diagnostic {
-            message: syntax_error.to_string(),
-            range: syntax_error.location.to_range(
+    let mut diagnostics = Vec::new();
+    let create_diagnostic = |message, range, severity, source| Diagnostic {
+        message,
+        range,
+        severity: Some(severity),
+        source: Some(source),
+        ..Default::default()
+    };
+
+    // Syntax errors diagnostic
+    diagnostics.extend(ast.errors().iter().map(|syntax_error| {
+        create_diagnostic(
+            syntax_error.to_string(),
+            syntax_error.location.to_range(
                 document.contents(),
                 document.index(),
                 snapshot.encoding(),
             ),
-            severity: Some(DiagnosticSeverity::ERROR),
-            source: Some("sith-lsp".into()),
-            ..Default::default()
-        })
-        .collect()
+            DiagnosticSeverity::ERROR,
+            crate::SERVER_NAME.into(),
+        )
+    }));
+
+    // Unresolved imports diagnostic
+    let table = db.table(&snapshot.url().to_file_path().expect("to be a filepath"));
+    diagnostics.extend(
+        table
+            .declarations()
+            .filter(|declaration| declaration.is_import() && declaration.import_source().is_none())
+            .map(|declaration| {
+                create_diagnostic(
+                    "Failed to resolve import".into(),
+                    declaration.range.to_range(
+                        document.contents(),
+                        document.index(),
+                        snapshot.encoding(),
+                    ),
+                    DiagnosticSeverity::ERROR,
+                    crate::SERVER_NAME.into(),
+                )
+            }),
+    );
+
+    diagnostics
 }
 
 const UNSUPPORTED_CHECK_ARGS: &[&str] = &[
