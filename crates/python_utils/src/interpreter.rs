@@ -33,13 +33,13 @@ pub fn resolve_python_interpreter(root: impl AsRef<Path>) -> Option<PathBuf> {
 
     // 2) Try to find the `.venv` directory by searching for the `pyvenv.cfg` file
     // contained inside the `.venv` dir in the project root.
-    if let Some(pyvenv_path) = WalkDir::new(&root)
-        .max_depth(2)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .find(|e| e.path().ends_with("pyvenv.cfg"))
-    {
-        if python_path.is_none() {
+    if python_path.is_none() {
+        if let Some(pyvenv_path) = WalkDir::new(&root)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .find(|e| e.path().ends_with("pyvenv.cfg"))
+        {
             let venv_path = pyvenv_path.path().parent().unwrap();
             python_path = get_python_path_in_venv(venv_path);
 
