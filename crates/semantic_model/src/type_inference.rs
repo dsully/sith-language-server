@@ -1294,7 +1294,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use python_ast::{AnyNodeRef, Expr};
-    use python_utils::{get_python_platform, get_python_search_paths, get_python_version};
+    use python_utils::{interpreter::resolve_python_interpreter, PythonHost};
     use ruff_text_size::Ranged;
 
     use crate::{
@@ -1322,16 +1322,9 @@ mod tests {
     }
 
     fn setup_db(src: &str, root: &Path, path: &Path) -> crate::db::SymbolTableDb {
-        let search_paths = get_python_search_paths("/usr/bin/python").unwrap();
-        let python_version = get_python_version("/usr/bin/python").unwrap();
-        let python_platform = get_python_platform().unwrap();
-        let mut db = SymbolTableDb::new(
-            root.to_path_buf(),
-            python_version,
-            python_platform,
-            search_paths.paths,
-        )
-        .with_builtin_symbols();
+        let interpreter = resolve_python_interpreter(root).expect("Valid python interpreter");
+        let mut db = SymbolTableDb::new(root.to_path_buf(), PythonHost::new(interpreter))
+            .with_builtin_symbols();
         db.indexer_mut()
             .add_or_update_file(path.to_path_buf(), Source::New(src));
         db

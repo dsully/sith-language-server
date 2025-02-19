@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Context};
 use lsp_types::Url;
-use python_utils::interpreter::{self, resolve_python_interpreter};
-use python_utils::{get_python_platform, get_python_search_paths, get_python_version};
-use ruff_python_resolver::python_platform::PythonPlatform;
-use ruff_python_resolver::python_version::PythonVersion;
+use python_utils::interpreter::resolve_python_interpreter;
+use python_utils::PythonHost;
 use rustc_hash::FxHashMap;
 use semantic_model::db::{Source, SymbolTableDb};
 use std::collections::BTreeMap;
@@ -55,17 +53,9 @@ pub(crate) struct SymbolTableDbController {
 }
 
 impl SymbolTableDbController {
-    pub fn new(
-        root: PathBuf,
-        python_version: PythonVersion,
-        python_platform: PythonPlatform,
-        python_search_paths: Vec<PathBuf>,
-    ) -> Self {
+    pub fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
-            table: Arc::new(
-                SymbolTableDb::new(root, python_version, python_platform, python_search_paths)
-                    .with_builtin_symbols(),
-            ),
+            table: Arc::new(SymbolTableDb::new(root, python_host).with_builtin_symbols()),
         }
     }
 
@@ -111,46 +101,27 @@ impl Workspace {
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
 
-        let (python_search_paths, python_version) = if let Some(interpreter) = resolved_settings
+        let python_host = if let Some(interpreter) = resolved_settings
             .interpreter()
             .filter(|interpreter| !interpreter.is_empty())
             .map(PathBuf::from)
             .or_else(|| resolve_python_interpreter(&root_path))
         {
-            let python_search_paths = get_python_search_paths(&interpreter)
-                .map_err(|err| {
-                    tracing::error!("{err}");
-                    show_err_msg!("{err}");
-                })
-                .map(|result| result.paths)
-                .unwrap_or_default();
-            let python_version = get_python_version(&interpreter)
-                .map_err(|err| {
-                    tracing::error!("{err}");
-                    show_err_msg!("{err}");
-                })
-                .unwrap_or(PythonVersion::None);
-            (python_search_paths, python_version)
+            tracing::info!("Using python interpreter: {}", interpreter.display());
+            PythonHost::new(interpreter)
         } else {
             tracing::error!("Python interpreter path was not set in settings and SithLSP failed to find a suitable python interpreter in the system!");
             show_err_msg!(
                 "Python interpreter path was not set in settings and SithLSP failed to find a suitable python interpreter in the system! Functionality will be limited."
             );
-            (vec![], PythonVersion::None)
+            PythonHost::invalid()
         };
-
-        let python_platform = get_python_platform()?;
 
         Ok((
             root_path.clone(),
             Self {
                 open_documents: OpenDocuments::default(),
-                symbol_table_db: SymbolTableDbController::new(
-                    root_path,
-                    python_version,
-                    python_platform,
-                    python_search_paths,
-                ),
+                symbol_table_db: SymbolTableDbController::new(root_path, python_host),
                 settings,
             },
         ))

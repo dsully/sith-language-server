@@ -10,9 +10,9 @@ use python_ast_utils::{
     create_import_module_descriptor,
     nodes::{NodeId, Nodes},
 };
+use python_utils::PythonHost;
 use ruff_python_resolver::{
-    config::Config, execution_environment::ExecutionEnvironment, host::StaticHost,
-    resolver::resolve_import,
+    config::Config, execution_environment::ExecutionEnvironment, resolver::resolve_import,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -132,14 +132,14 @@ bitflags! {
 pub struct ImportResolverConfig<'a> {
     exec_env: &'a ExecutionEnvironment,
     config: &'a Config,
-    host: &'a StaticHost,
+    host: &'a PythonHost,
 }
 
 impl<'a> ImportResolverConfig<'a> {
     pub fn new(
         exec_env: &'a ExecutionEnvironment,
         config: &'a Config,
-        host: &'a StaticHost,
+        host: &'a PythonHost,
     ) -> Self {
         Self {
             exec_env,

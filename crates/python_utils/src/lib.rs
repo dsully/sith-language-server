@@ -4,7 +4,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-use ruff_python_resolver::{python_platform::PythonPlatform, python_version::PythonVersion};
+use ruff_python_resolver::{
+    host::Host, python_platform::PythonPlatform, python_version::PythonVersion,
+};
 use serde::{Deserialize, Serialize};
 
 pub mod interpreter;
@@ -193,4 +195,45 @@ pub fn is_python_module(name: &str, path: &Path) -> bool {
 
 fn is_python_dir_module(name: &str, path: &Path) -> bool {
     path.ends_with(format!("{name}/__init__.py")) || path.ends_with(format!("{name}/__init__.pyi"))
+}
+
+#[derive(Debug, Clone)]
+pub struct PythonHost {
+    pub version: PythonVersion,
+    pub search_paths: Vec<PathBuf>,
+    pub platform: PythonPlatform,
+}
+
+impl PythonHost {
+    pub fn new(interpreter: impl AsRef<Path>) -> Self {
+        Self {
+            version: get_python_version(interpreter.as_ref()).unwrap_or(PythonVersion::None),
+            search_paths: get_python_search_paths(interpreter.as_ref())
+                .map(|result| result.paths)
+                .unwrap_or_default(),
+            platform: get_python_platform().unwrap(),
+        }
+    }
+
+    pub fn invalid() -> Self {
+        Self {
+            version: PythonVersion::None,
+            search_paths: Vec::new(),
+            platform: PythonPlatform::Linux,
+        }
+    }
+}
+
+impl Host for PythonHost {
+    fn python_search_paths(&self) -> Vec<PathBuf> {
+        self.search_paths.clone()
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.version
+    }
+
+    fn python_platform(&self) -> PythonPlatform {
+        self.platform
+    }
 }

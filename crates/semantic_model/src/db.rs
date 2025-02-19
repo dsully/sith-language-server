@@ -9,14 +9,11 @@ use bimap::BiHashMap;
 use python_ast::{ModModule, Suite};
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
+use python_utils::PythonHost;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
-    config::Config,
-    execution_environment::ExecutionEnvironment,
-    host::{Host, StaticHost},
-    python_platform::PythonPlatform,
-    python_version::PythonVersion,
+    config::Config, execution_environment::ExecutionEnvironment, host::Host,
 };
 use rustc_hash::{FxHashMap, FxHasher};
 use serde::{Deserialize, Serialize};
@@ -142,26 +139,21 @@ pub struct Indexer {
 
     exec_env: ExecutionEnvironment,
     config: Config,
-    host: StaticHost,
+    host: PythonHost,
 
     was_root_path_indexed: bool,
 }
 
 impl Indexer {
-    fn new(
-        root: PathBuf,
-        python_version: PythonVersion,
-        python_platform: PythonPlatform,
-        python_search_paths: Vec<PathBuf>,
-    ) -> Self {
+    fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
             tables: FxHashMap::default(),
             asts: FxHashMap::default(),
             files: Files::default(),
             exec_env: ExecutionEnvironment {
                 root,
-                python_version,
-                python_platform,
+                python_version: python_host.version,
+                python_platform: python_host.platform,
                 // TODO: add settings option in the LSP for this
                 extra_paths: vec![],
             },
@@ -172,7 +164,7 @@ impl Indexer {
                 venv_path: None,
                 venv: None,
             },
-            host: StaticHost::new(python_search_paths),
+            host: python_host,
             was_root_path_indexed: false,
         }
     }
@@ -392,14 +384,9 @@ pub struct SymbolTableDb {
 }
 
 impl SymbolTableDb {
-    pub fn new(
-        root: PathBuf,
-        python_version: PythonVersion,
-        python_platform: PythonPlatform,
-        python_search_paths: Vec<PathBuf>,
-    ) -> Self {
+    pub fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
-            index: Indexer::new(root, python_version, python_platform, python_search_paths),
+            index: Indexer::new(root, python_host),
             builtin_symbol_table: BuiltinSymbolTable::default(),
         }
     }
