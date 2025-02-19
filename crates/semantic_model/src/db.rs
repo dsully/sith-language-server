@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::{
-    declaration::{DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery},
+    declaration::{DeclId, Declaration, DeclarationQuery},
     symbol::{Symbol, SymbolId},
     symbol_table::{ImportResolverConfig, SymbolTable, SymbolTableBuilder},
     vendored::setup_typeshed,
@@ -222,13 +222,11 @@ impl Indexer {
         .build(parsed_file.suite());
 
         let mut import_paths = Vec::new();
-        for import_decl in table
+        for import_source in table
             .declarations()
-            .filter(|decl| matches!(decl.kind, DeclarationKind::Stmt(DeclStmt::Import { .. })))
+            .filter_map(|declaration| declaration.import_source())
         {
-            if let Some(source) = import_decl.import_source() {
-                import_paths.push(source.clone());
-            }
+            import_paths.push(import_source.clone());
         }
 
         (table, parsed_file, import_paths)
