@@ -1,9 +1,7 @@
 import { ExtensionContext, workspace } from "vscode";
 import * as vscode from "vscode";
-import * as fs from "fs-extra";
 
 import {
-    Disposable,
     Executable,
     LanguageClient,
     LanguageClientOptions,
@@ -27,7 +25,14 @@ let restartQueued = false;
 const serverId = "sith";
 
 export async function activate(context: ExtensionContext) {
-    await runServer();
+    // Create output channels for the server and trace logs
+    const outputChannel = vscode.window.createOutputChannel(`Sith Language Server`);
+    const traceOutputChannel = new LazyOutputChannel(`Sith Language Server Trace`);
+
+    // Make sure that these channels are disposed when the extension is deactivated.
+    context.subscriptions.push(outputChannel);
+    context.subscriptions.push(traceOutputChannel);
+    context.subscriptions.push(logger.channel);
 
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e: vscode.ConfigurationChangeEvent) => {
@@ -35,7 +40,40 @@ export async function activate(context: ExtensionContext) {
                 await runServer();
             }
         }),
+        registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()),
     );
+
+    const runServer = async () => {
+        if (restartInProgress) {
+            if (!restartQueued) {
+                // Schedule a new restart after the current restart.
+                logger.trace(
+                    `Triggered SithLSP restart while restart is in progress; queuing a restart.`,
+                );
+                restartQueued = true;
+            }
+            return;
+        }
+
+        restartInProgress = true;
+
+        try {
+            if (client) {
+                await stopServer();
+            }
+
+            await startServer(outputChannel, traceOutputChannel);
+        } finally {
+            // Ensure that we reset the flag in case of an error, early return, or success.
+            restartInProgress = false;
+            if (restartQueued) {
+                restartQueued = false;
+                await runServer();
+            }
+        }
+    };
+
+    await runServer();
 }
 
 export function deactivate(): Thenable<void> {
@@ -44,52 +82,17 @@ export function deactivate(): Thenable<void> {
     }
 }
 
-async function runServer() {
-    if (restartInProgress) {
-        if (!restartQueued) {
-            // Schedule a new restart after the current restart.
-            logger.trace(`Triggered SithLSP restart while restart is in progress; queuing a restart.`);
-            restartQueued = true;
-        }
-        return;
-    }
-
-    restartInProgress = true;
-
-    try {
-        if (client) {
-            await stopServer();
-        }
-
-        await startServer();
-    } finally {
-        // Ensure that we reset the flag in case of an error, early return, or success.
-        restartInProgress = false;
-        if (restartQueued) {
-            restartQueued = false;
-            await runServer();
-        }
-    }
-}
-
-let _disposables: Disposable[] = [];
-
-async function startServer() {
+async function startServer(
+    outputChannel: vscode.OutputChannel,
+    traceOutputChannel: vscode.OutputChannel,
+) {
     logger.info("Server started");
-
-    // Create output channels for the server and trace logs
-    const outputChannel = vscode.window.createOutputChannel(`Sith Language Server`);
-    _disposables.push(outputChannel);
-    const traceOutputChannel = new LazyOutputChannel(`Sith Language Server Trace`);
-    _disposables.push(traceOutputChannel);
-    // And, a command to show the server logs
-    _disposables.push(registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()));
 
     const extensionSettings = getExtensionSettings(serverId);
     const globalSettings = getGlobalSettings(serverId);
 
     const projectRoot = await getProjectRoot();
-    const workspaceSettings = await getWorkspaceSettings(serverId, projectRoot);
+    const workspaceSettings = getWorkspaceSettings(serverId, projectRoot);
 
     let command: string;
     if (process.env.DEV_MODE === "true") {
@@ -138,10 +141,4 @@ async function startServer() {
 async function stopServer() {
     logger.info("Server stopped");
     await client.stop();
-    dispose();
-}
-
-function dispose(): void {
-    _disposables.forEach((d) => d.dispose());
-    _disposables = [];
 }
