@@ -14,7 +14,7 @@ use python_utils::PythonHost;
 use ruff_python_resolver::{
     config::Config, execution_environment::ExecutionEnvironment, resolver::resolve_import,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -431,7 +431,7 @@ where
                 );
 
                 if let Some(module) = &import_from.module {
-                    let mut prev_segment_len = 0;
+                    let mut pos = 0;
                     for (i, segment) in module
                         .split('.')
                         .filter(|part| !part.is_empty())
@@ -464,13 +464,11 @@ where
                             } else {
                                 (None, None)
                             };
-                        let segment_range =
-                            module.range.add_start(prev_segment_len.into()).sub_end(
-                                segment
-                                    .len()
-                                    .try_into()
-                                    .expect("failed to cast from usize to TextSize"),
-                            );
+
+                        let start = module.range().start().to_u32() + pos;
+                        let end = start + segment.len() as u32;
+                        let segment_range = TextRange::new(start.into(), end.into());
+
                         self.push_declaration(
                             segment,
                             DeclarationKind::Stmt(DeclStmt::ImportSegment {
@@ -480,7 +478,7 @@ where
                             segment_range,
                             node_id,
                         );
-                        prev_segment_len = segment.len() as u32 + 1; // + 1 for the `.`
+                        pos += segment.len() as u32 + 1; // + 1 for the `.`
                     }
                 }
 
@@ -573,7 +571,7 @@ where
                         self.import_resolver_cfg.host,
                     );
 
-                    let mut prev_segment_len = 0;
+                    let mut pos = 0;
                     for (i, segment) in name
                         .name
                         .split('.')
@@ -610,12 +608,10 @@ where
                                 (None, None)
                             };
 
-                        let segment_range = name.range.add_start(prev_segment_len.into()).sub_end(
-                            segment
-                                .len()
-                                .try_into()
-                                .expect("failed to cast from usize to TextSize"),
-                        );
+                        let start = name.range().start().to_u32() + pos;
+                        let end = start + segment.len() as u32;
+                        let segment_range = TextRange::new(start.into(), end.into());
+
                         let (decl_id, _) = self.push_declaration(
                             segment,
                             if is_first_segment {
@@ -632,7 +628,7 @@ where
                             segment_range,
                             self.curr_node.unwrap(),
                         );
-                        prev_segment_len = segment.len() as u32 + 1; // + 1 for the `.`
+                        pos += segment.len() as u32 + 1; // + 1 for the `.`
 
                         if let Some(name) = name.asname.as_ref() {
                             self.push_declaration(
