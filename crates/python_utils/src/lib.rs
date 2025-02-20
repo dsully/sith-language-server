@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub mod interpreter;
 pub mod nodes;
 
+/// A set of file names that indicate a Python project root directory.
 pub static ROOT_FILES: LazyLock<FxHashSet<&str>> = LazyLock::new(|| {
     FxHashSet::from_iter([
         ".git",
@@ -207,6 +208,44 @@ pub fn is_python_module(name: &str, path: &Path) -> bool {
 
 fn is_python_dir_module(name: &str, path: &Path) -> bool {
     path.ends_with(format!("{name}/__init__.py")) || path.ends_with(format!("{name}/__init__.pyi"))
+}
+
+/// Finds the root directory of a Python project by looking for specific marker files.
+///
+/// Starting from the given path, this function searches for files that typically indicate
+/// a Python project root (see [`ROOT_FILES`]). If no marker file is found in the current directory, it continues
+/// searching in parent directories until either:
+/// - A directory containing a marker file is found
+/// - The root of the filesystem is reached
+///
+/// # Returns
+///
+/// * If a marker file is found in any directory, returns that directory
+/// * If no marker file is found after reaching the root, returns the original path
+pub fn find_python_project_root(origin_path: impl AsRef<Path>) -> PathBuf {
+    let mut path = origin_path.as_ref();
+    loop {
+        let Ok(files) = fs::read_dir(path) else {
+            break;
+        };
+
+        let has_root_file = files.filter_map(|e| e.ok()).any(|e| {
+            let path = e.path();
+            let file_name = path.file_name().map(|f| f.to_string_lossy()).unwrap();
+            ROOT_FILES.contains(file_name.as_ref())
+        });
+
+        if has_root_file {
+            return path.to_path_buf();
+        }
+
+        match path.parent() {
+            Some(parent_path) => path = parent_path,
+            None => break,
+        }
+    }
+
+    origin_path.as_ref().to_path_buf()
 }
 
 #[derive(Debug, Clone)]

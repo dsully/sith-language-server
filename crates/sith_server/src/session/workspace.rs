@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use lsp_types::Url;
 use python_utils::interpreter::resolve_python_interpreter;
-use python_utils::PythonHost;
+use python_utils::{find_python_project_root, PythonHost};
 use rustc_hash::FxHashMap;
 use semantic_model::db::{Source, SymbolTableDb};
 use std::collections::BTreeMap;
@@ -95,9 +95,11 @@ impl Workspace {
         settings: ClientSettings,
         global_settings: &ClientSettings,
     ) -> crate::Result<(PathBuf, Self)> {
-        let root_path = root
-            .to_file_path()
-            .map_err(|_| anyhow!("workspace URL was not a file path!"))?;
+        let root_path = find_python_project_root(
+            &root
+                .to_file_path()
+                .map_err(|_| anyhow!("workspace URL was not a file path!"))?,
+        );
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
 
