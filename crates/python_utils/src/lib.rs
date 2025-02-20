@@ -2,15 +2,27 @@ use std::{
     fs::{self, ReadDir},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::LazyLock,
 };
 
 use ruff_python_resolver::{
     host::Host, python_platform::PythonPlatform, python_version::PythonVersion,
 };
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
 pub mod interpreter;
 pub mod nodes;
+
+pub static ROOT_FILES: LazyLock<FxHashSet<&str>> = LazyLock::new(|| {
+    FxHashSet::from_iter([
+        ".git",
+        "requirements.txt",
+        "Pipfile",
+        "pyproject.toml",
+        "setup.py",
+    ])
+});
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PythonPathResult {

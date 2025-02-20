@@ -9,7 +9,9 @@ use bimap::BiHashMap;
 use python_ast::{ModModule, Suite};
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
-use python_utils::PythonHost;
+use python_utils::{
+    PythonHost, ROOT_FILES,
+};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
@@ -176,23 +178,28 @@ impl Indexer {
     ///   * pyproject.toml
     ///   * requirements.txt
     ///   * .git directory
+    ///   * Pipfile
+    ///   * setup.py
     ///     then it will recursively scan all subdirectories for Python files.
     /// - If none of these indicators are present, it will only scan the immediate directory
     ///   (non-recursively) for Python files.
-    fn scan_dir_for_python_files(path: impl AsRef<Path>) -> Vec<PathBuf> {
-        let path = path.as_ref();
-        assert!(path.is_dir());
+    fn scan_dir_for_python_files(root_dir: impl AsRef<Path>) -> Vec<PathBuf> {
+        let root_dir = root_dir.as_ref();
+        assert!(root_dir.is_dir());
 
         let mut python_files = Vec::new();
 
-        let has_pyproject_file = path.join("pyproject.toml").exists();
-        let has_requirements_file = path.join("requirements.txt").exists();
-        let has_git_dir = path.join(".git").is_dir();
-
-        let should_scan_subdirs = has_pyproject_file || has_requirements_file || has_git_dir;
+        let should_scan_subdirs = fs::read_dir(root_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .any(|e| {
+                let path = e.path();
+                let file_name = path.file_name().map(|f| f.to_string_lossy()).unwrap();
+                ROOT_FILES.contains(file_name.as_ref())
+            });
         let max_scan_depth = if should_scan_subdirs { usize::MAX } else { 1 };
 
-        for entry in WalkDir::new(path)
+        for entry in WalkDir::new(root_dir)
             .max_depth(max_scan_depth)
             .into_iter()
             .filter_entry(|e| !e.path().ends_with(".venv"))
