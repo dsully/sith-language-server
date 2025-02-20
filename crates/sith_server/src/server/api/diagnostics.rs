@@ -8,6 +8,7 @@ use anyhow::Context;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, Url,
 };
+use semantic_model::declaration::{DeclStmt, DeclarationKind};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -48,11 +49,10 @@ struct RuffLintDiagnostic {
 }
 
 pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diagnostic> {
+    let document_path = snapshot.url().to_file_path().expect("to be a filepath");
     let db = snapshot.db();
     let document = snapshot.document();
-    let ast = db
-        .indexer()
-        .ast(&snapshot.url().to_file_path().expect("to be a filepath"));
+    let ast = db.indexer().ast(&document_path);
 
     let mut diagnostics = Vec::new();
     let create_diagnostic = |message, range, severity, source| Diagnostic {
@@ -78,11 +78,27 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
     }));
 
     // Unresolved imports diagnostic
-    let table = db.table(&snapshot.url().to_file_path().expect("to be a filepath"));
+    let table = db.table(&document_path);
     diagnostics.extend(
         table
             .declarations()
-            .filter(|declaration| declaration.is_import() && declaration.import_source().is_none())
+            .filter(|declaration| match &declaration.kind {
+                DeclarationKind::Stmt(
+                    DeclStmt::Import {
+                        stub_source: None,
+                        non_stub_source: None,
+                    }
+                    | DeclStmt::ImportSegment {
+                        stub_source: None,
+                        non_stub_source: None,
+                    },
+                ) => true,
+                DeclarationKind::Stmt(DeclStmt::SameImport(decl_id)) => db
+                    .declaration(&document_path, *decl_id)
+                    .import_source()
+                    .is_none(),
+                _ => false,
+            })
             .map(|declaration| {
                 create_diagnostic(
                     "Failed to resolve import".into(),

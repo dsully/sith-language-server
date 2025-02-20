@@ -240,8 +240,8 @@ impl<'a> SymbolTableBuilder<'a> {
         // don't create multiple declarations for the same import segment
         if let Some(symbol_id) = scope.symbol_id(name) {
             let symbol = self.table.symbols.get(symbol_id).unwrap();
-            let decl_id = symbol.declarations().last();
-            let declaration = self.table.decls.get(decl_id).unwrap();
+            let import_decl_id = symbol.declarations().last();
+            let declaration = self.table.decls.get(import_decl_id).unwrap();
             if matches!(
                 declaration.kind,
                 DeclarationKind::Stmt(
@@ -250,6 +250,14 @@ impl<'a> SymbolTableBuilder<'a> {
                         | DeclStmt::ImportAlias(_)
                 )
             ) {
+                let decl_id = self.table.decls.insert(
+                    self.file_id,
+                    DeclarationKind::Stmt(DeclStmt::SameImport(import_decl_id)),
+                    node_id,
+                    range,
+                );
+                let declaration = self.table.decls.get_mut(decl_id).unwrap();
+                declaration.symbol_id = symbol_id;
                 return (decl_id, symbol_id);
             }
         }

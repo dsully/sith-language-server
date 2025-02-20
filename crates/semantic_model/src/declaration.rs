@@ -98,6 +98,18 @@ pub enum DeclStmt {
         non_stub_source: Option<PathBuf>,
     },
     ImportAlias(DeclId),
+    /// Special-case: this used when we have the same import name multiple times in the source
+    /// code. Example:
+    /// ```
+    /// from foo.bar import Bar
+    /// from foo import Foo
+    /// ```
+    /// In this case symbol `foo` is used twice, this would create two different [`DeclStmt::Import`] declarations,
+    /// to save some memory we just point to the first `foo` declaration made.
+    ///
+    /// This is only used for computing the LSP diagnostics of a document, any other LSP operation
+    /// will ignore this.
+    SameImport(DeclId),
     AnnAssign,
     AugAssign,
 }
