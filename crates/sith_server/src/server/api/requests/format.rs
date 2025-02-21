@@ -1,28 +1,12 @@
-use std::{
-    io::Write,
-    process::{Command, Stdio},
-};
-
 use crate::{
     edit::{Replacement, ToRangeExt},
     server::{api::LSPResult, client::Notifier, Result},
     session::DocumentSnapshot,
+    util::{run_ruff_format, UNSUPPORTED_FORMAT_ARGS},
 };
 use anyhow::Context;
 use lsp_types::{self as types, request as req, TextEdit};
 use ruff_source_file::LineIndex;
-
-// Arguments that are not allowed to be passed to `ruff format`.
-const UNSUPPORTED_FORMAT_ARGS: &[&str] = &[
-    "--force-exclude",
-    "--quiet",
-    "-h",
-    "--help",
-    "--no-force-exclude",
-    "--silent",
-    "--verbose",
-    "--stdin-filename",
-];
 
 pub(crate) struct Format;
 
@@ -35,55 +19,32 @@ impl super::BackgroundDocumentRequestHandler for Format {
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         _notifier: Notifier,
-        params: types::DocumentFormattingParams,
+        _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
         let settings = snapshot.client_settings();
         if !settings.is_format_enabled() {
             return Ok(None);
         }
 
-        let document = snapshot.document();
         let Some(ruff_path) = settings.ruff_path() else {
             tracing::warn!("Ruff path was not set in settings!");
             show_warn_msg!("Ruff path was not set in settings!");
             return Ok(None);
         };
-        let mut child = Command::new(ruff_path)
-            .arg("format")
-            .args(
-                [
-                    "--force-exclude",
-                    "--quiet",
-                    "--stdin-filename",
-                    params.text_document.uri.as_ref(),
-                ]
-                .into_iter()
-                .chain(remove_unsupported_format_args(settings.format_args())),
-            )
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .context("Failed to execute Ruff")
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        let source = document.contents().to_string();
-        let mut stdin = child
-            .stdin
-            .take()
-            .context("Failed to open stdin")
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-        std::thread::spawn(move || {
-            stdin
-                .write_all(source.as_bytes())
-                .context("Failed to write to stdin")
-                .unwrap()
-        });
-
-        let output = child
-            .wait_with_output()
-            .context("Failed to wait on child")
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let args = settings
+            .format_args()
+            .iter()
+            .filter(|&arg| UNSUPPORTED_FORMAT_ARGS.contains(&arg.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        let output = run_ruff_format(
+            ruff_path,
+            snapshot.url().as_str(),
+            snapshot.document().contents(),
+            args.iter().map(String::as_str),
+        )
+        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         if output.status.code().is_some_and(|code| code != 0) {
             return Err(anyhow::anyhow!(
@@ -92,8 +53,9 @@ impl super::BackgroundDocumentRequestHandler for Format {
             .context("Ruff formatting failed")
             .with_failure_code(lsp_server::ErrorCode::InternalError);
         }
-        let source = document.contents();
 
+        let document = snapshot.document();
+        let source = document.contents();
         let formatted = String::from_utf8_lossy(&output.stdout);
 
         let formatted_index = LineIndex::from_source_text(&formatted);
@@ -114,15 +76,4 @@ impl super::BackgroundDocumentRequestHandler for Format {
             new_text: formatted[formatted_range].to_owned(),
         }]))
     }
-}
-
-fn remove_unsupported_format_args(args: &[String]) -> impl Iterator<Item = &str> {
-    args.iter().filter_map(|arg| {
-        if UNSUPPORTED_FORMAT_ARGS.contains(&arg.as_str()) {
-            tracing::info!("Ignoring unsupported argument: {arg}");
-            None
-        } else {
-            Some(arg.as_str())
-        }
-    })
 }

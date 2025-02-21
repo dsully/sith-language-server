@@ -1,10 +1,7 @@
-use std::{
-    io::Write,
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use std::path::PathBuf;
 
 use anyhow::Context;
+use lsp_server::ErrorCode;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, Url,
 };
@@ -14,38 +11,66 @@ use serde::{Deserialize, Serialize};
 use crate::{
     edit::ToRangeExt,
     server::{api::LSPResult, Result},
+    util::{run_ruff_check, UNSUPPORTED_CHECK_ARGS},
 };
 use crate::{server::client::Notifier, session::DocumentSnapshot};
 
 #[derive(Deserialize, Serialize, Debug)]
-struct RuffLintLocation {
-    column: u32,
-    row: u32,
+pub(super) struct RuffLintLocation {
+    pub(super) column: u32,
+    pub(super) row: u32,
+}
+
+impl RuffLintLocation {
+    fn lsp_position(&self) -> lsp_types::Position {
+        Position {
+            line: self.row - 1,
+            character: self.column - 1,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct FixEdit {
-    content: String,
-    location: RuffLintLocation,
-    end_location: RuffLintLocation,
+pub(super) struct FixEdit {
+    pub(super) content: String,
+    pub(super) location: RuffLintLocation,
+    pub(super) end_location: RuffLintLocation,
+}
+
+impl FixEdit {
+    pub(super) fn lsp_range(&self) -> lsp_types::Range {
+        Range {
+            start: self.location.lsp_position(),
+            end: self.end_location.lsp_position(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct LintFix {
-    applicability: String,
-    edits: Vec<FixEdit>,
+pub(super) struct LintFix {
+    pub(super) applicability: String,
+    pub(super) edits: Vec<FixEdit>,
 }
 
 // TODO: add support for fixing lints
 #[derive(Deserialize, Serialize, Debug)]
-struct RuffLintDiagnostic {
-    filename: PathBuf,
-    message: String,
-    code: Option<String>,
-    location: RuffLintLocation,
-    end_location: RuffLintLocation,
-    url: Option<Url>,
-    fix: Option<LintFix>,
+pub(super) struct RuffLintDiagnostic {
+    pub(super) filename: PathBuf,
+    pub(super) message: String,
+    pub(super) code: Option<String>,
+    pub(super) location: RuffLintLocation,
+    pub(super) end_location: RuffLintLocation,
+    pub(super) url: Option<Url>,
+    pub(super) fix: Option<LintFix>,
+}
+
+impl RuffLintDiagnostic {
+    pub(super) fn lsp_range(&self) -> lsp_types::Range {
+        Range {
+            start: self.location.lsp_position(),
+            end: self.end_location.lsp_position(),
+        }
+    }
 }
 
 pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diagnostic> {
@@ -116,33 +141,6 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
     diagnostics
 }
 
-const UNSUPPORTED_CHECK_ARGS: &[&str] = &[
-    "--force-exclude",
-    "--no-cache",
-    "--no-fix",
-    "--quiet",
-    "--diff",
-    "--exit-non-zero-on-fix",
-    "-e",
-    "--exit-zero",
-    "--fix",
-    "--fix-only",
-    "-h",
-    "--help",
-    "--no-force-exclude",
-    "--show-files",
-    "--show-fixes",
-    "--show-settings",
-    "--show-source",
-    "--silent",
-    "--statistics",
-    "--verbose",
-    "-w",
-    "--watch",
-    "--stdin-filename",
-    "--output-format",
-];
-
 pub(super) fn generate_ruff_lint_diagnostics(
     snapshot: &DocumentSnapshot,
 ) -> Result<Vec<Diagnostic>> {
@@ -154,60 +152,31 @@ pub(super) fn generate_ruff_lint_diagnostics(
         return Ok(vec![]);
     };
 
-    let mut cmd = Command::new(ruff_path);
-    cmd.arg("check").args(
-        [
-            "--no-fix",
-            "--force-exclude",
-            "--quiet",
-            "--output-format",
-            "json",
-            "--stdin-filename",
-            snapshot.url().as_str(),
-        ]
-        .into_iter()
-        .chain(remove_unsupported_check_args(settings.lint_args())),
-    );
-
+    let mut args = settings
+        .lint_args()
+        .iter()
+        .filter(|arg| UNSUPPORTED_CHECK_ARGS.contains(&arg.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
     if let Some(select) = settings.lint_select() {
-        cmd.arg("--select").arg(select.join(","));
+        args.extend(["--select".into(), select.join(",")]);
     }
-
     if let Some(extend_select) = settings.lint_extend_select() {
-        cmd.arg("--extend-select").arg(extend_select.join(","));
+        args.extend(["--extend-select".into(), extend_select.join(",")]);
     }
-
     if let Some(ignore) = settings.lint_ignore() {
         if !ignore.is_empty() {
-            cmd.args(["--ignore", &ignore.join(",")]);
+            args.extend(["--ignore".into(), ignore.join(",")]);
         }
     }
 
-    let mut child = cmd
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("Failed to execute Ruff")
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-
-    let contents = snapshot.document().contents().to_string();
-    let mut stdin = child
-        .stdin
-        .take()
-        .context("Failed to open stdin")
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-
-    std::thread::spawn(move || {
-        stdin
-            .write_all(contents.as_bytes())
-            .context("Failed to write to stdin")
-            .unwrap()
-    });
-    let output = child
-        .wait_with_output()
-        .context("Failed to wait on child")
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let output = run_ruff_check(
+        ruff_path,
+        snapshot.url().as_str(),
+        snapshot.document().contents(),
+        args.iter().map(String::as_str),
+    )
+    .with_failure_code(ErrorCode::InternalError)?;
 
     if output.status.code().is_some_and(|code| code == 2) {
         return Err(anyhow::anyhow!(
@@ -232,6 +201,7 @@ pub(super) fn generate_ruff_lint_diagnostics(
     Ok(result
         .into_iter()
         .map(|lint_diagnostic| Diagnostic {
+            range: lint_diagnostic.lsp_range(),
             message: lint_diagnostic.message,
             code: Some(NumberOrString::String(lint_diagnostic.code.unwrap())),
             severity: Some(DiagnosticSeverity::WARNING),
@@ -239,16 +209,6 @@ pub(super) fn generate_ruff_lint_diagnostics(
             code_description: Some(CodeDescription {
                 href: lint_diagnostic.url.unwrap(),
             }),
-            range: Range {
-                start: Position {
-                    line: lint_diagnostic.location.row - 1,
-                    character: lint_diagnostic.location.column - 1,
-                },
-                end: Position {
-                    line: lint_diagnostic.end_location.row - 1,
-                    character: lint_diagnostic.end_location.column - 1,
-                },
-            },
             data: lint_diagnostic
                 .fix
                 .map(|fix| serde_json::to_value(fix).unwrap()),
@@ -293,15 +253,4 @@ pub(super) fn clear_diagnostics_for_document(
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
     Ok(())
-}
-
-fn remove_unsupported_check_args(args: &[String]) -> impl Iterator<Item = &str> {
-    args.iter().filter_map(|arg| {
-        if UNSUPPORTED_CHECK_ARGS.contains(&arg.as_str()) {
-            tracing::info!("Ignoring unsupported argument: {arg}");
-            None
-        } else {
-            Some(arg.as_str())
-        }
-    })
 }
