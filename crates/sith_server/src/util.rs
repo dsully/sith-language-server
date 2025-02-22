@@ -130,7 +130,20 @@ where
     )
 }
 
+pub(crate) fn run_ruff_fix<'a, I>(
+    ruff_path: impl AsRef<OsStr>,
+    filename: &'a str,
+    content: &str,
+    extra_args: I,
+) -> crate::Result<(String, Output)>
 where
     I: IntoIterator<Item = &'a str>,
 {
+    let output = run_ruff_check(
+        ruff_path,
+        filename,
+        content,
+        extra_args.into_iter().chain(["--fix"]),
+    )?;
+    Ok((String::from_utf8_lossy(&output.stdout).to_string(), output))
 }

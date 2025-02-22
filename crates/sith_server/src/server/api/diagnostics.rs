@@ -16,14 +16,15 @@ use crate::{
 use crate::{server::client::Notifier, session::DocumentSnapshot};
 
 #[derive(Deserialize, Serialize, Debug)]
-pub(super) struct RuffLintLocation {
-    pub(super) column: u32,
-    pub(super) row: u32,
+pub(crate) struct RuffLintLocation {
+    pub(crate) column: u32,
+    pub(crate) row: u32,
 }
 
 impl RuffLintLocation {
     fn lsp_position(&self) -> lsp_types::Position {
         Position {
+            // The lint location is one-based but the lsp_types::Position is zero-based
             line: self.row - 1,
             character: self.column - 1,
         }
@@ -31,14 +32,14 @@ impl RuffLintLocation {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub(super) struct FixEdit {
-    pub(super) content: String,
-    pub(super) location: RuffLintLocation,
-    pub(super) end_location: RuffLintLocation,
+pub(crate) struct FixEdit {
+    pub(crate) content: String,
+    pub(crate) location: RuffLintLocation,
+    pub(crate) end_location: RuffLintLocation,
 }
 
 impl FixEdit {
-    pub(super) fn lsp_range(&self) -> lsp_types::Range {
+    pub(crate) fn lsp_range(&self) -> lsp_types::Range {
         Range {
             start: self.location.lsp_position(),
             end: self.end_location.lsp_position(),
@@ -47,21 +48,20 @@ impl FixEdit {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub(super) struct LintFix {
-    pub(super) applicability: String,
-    pub(super) edits: Vec<FixEdit>,
+pub(crate) struct LintFix {
+    pub(crate) applicability: String,
+    pub(crate) edits: Vec<FixEdit>,
 }
 
-// TODO: add support for fixing lints
 #[derive(Deserialize, Serialize, Debug)]
-pub(super) struct RuffLintDiagnostic {
-    pub(super) filename: PathBuf,
-    pub(super) message: String,
-    pub(super) code: Option<String>,
-    pub(super) location: RuffLintLocation,
-    pub(super) end_location: RuffLintLocation,
-    pub(super) url: Option<Url>,
-    pub(super) fix: Option<LintFix>,
+pub(crate) struct RuffLintDiagnostic {
+    pub(crate) filename: PathBuf,
+    pub(crate) message: String,
+    pub(crate) code: Option<String>,
+    pub(crate) location: RuffLintLocation,
+    pub(crate) end_location: RuffLintLocation,
+    pub(crate) url: Option<Url>,
+    pub(crate) fix: Option<LintFix>,
 }
 
 impl RuffLintDiagnostic {

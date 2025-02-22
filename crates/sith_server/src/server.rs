@@ -6,6 +6,8 @@ use connection::Connection;
 use connection::ConnectionInitializer;
 use lsp_server as lsp;
 use lsp_types as types;
+use lsp_types::CodeActionKind;
+use lsp_types::CodeActionOptions;
 use lsp_types::CompletionOptions;
 use lsp_types::HoverProviderCapability;
 use types::ClientCapabilities;
@@ -32,6 +34,7 @@ mod client;
 mod connection;
 mod schedule;
 
+pub(crate) use api::RuffLintDiagnostic;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -286,7 +289,48 @@ impl Server {
             })),
             document_highlight_provider: Some(OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            code_action_provider: Some(types::CodeActionProviderCapability::Options(
+                CodeActionOptions {
+                    code_action_kinds: Some(
+                        SupportedCodeAction::all()
+                            .map(SupportedCodeAction::to_kind)
+                            .collect(),
+                    ),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: Some(true),
+                    },
+                    resolve_provider: Some(true),
+                },
+            )),
             ..Default::default()
         }
+    }
+}
+
+/// The code actions we support.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum SupportedCodeAction {
+    /// Maps to `source.organizeImports` and `source.organizeImports.sith` code action kinds.
+    /// This is a source action that applies import sorting fixes to the currently open document.
+    SourceOrganizeImports,
+}
+
+impl SupportedCodeAction {
+    /// Returns the LSP code action kind that map to this code action.
+    fn to_kind(self) -> CodeActionKind {
+        match self {
+            Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_SITH,
+        }
+    }
+
+    fn from_kind(kind: CodeActionKind) -> impl Iterator<Item = Self> {
+        Self::all().filter(move |supported_kind| {
+            supported_kind.to_kind().as_str().starts_with(kind.as_str())
+        })
+    }
+
+    /// Returns all code actions kinds that the server currently supports.
+    fn all() -> impl Iterator<Item = Self> {
+        [Self::SourceOrganizeImports].into_iter()
     }
 }

@@ -10,7 +10,7 @@ use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, Url};
 use semantic_model::db::Source;
 use settings::ResolvedClientSettings;
-use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
+pub(crate) use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
 
 use crate::edit::DocumentVersion;
 use crate::PositionEncoding;

@@ -12,6 +12,7 @@ use requests as request;
 use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{client::Responder, schedule::BackgroundSchedule, Result};
+pub(crate) use diagnostics::RuffLintDiagnostic;
 
 /// Defines the `document_url` method for implementers of [`traits::Notification`] and [`traits::Request`],
 /// given the parameter type used by the implementer.
@@ -67,6 +68,12 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         }
         request::PrepareRename::METHOD => {
             background_request_task::<request::PrepareRename>(req, BackgroundSchedule::Worker)
+        }
+        request::CodeActions::METHOD => {
+            background_request_task::<request::CodeActions>(req, BackgroundSchedule::Worker)
+        }
+        request::CodeActionResolve::METHOD => {
+            background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
         }
         method => {
             tracing::warn!("Received request {method} which does not have a handler");

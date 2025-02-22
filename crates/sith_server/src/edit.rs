@@ -2,6 +2,7 @@
 
 mod convert;
 mod document;
+pub(crate) mod fix;
 mod replacement;
 
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ use std::collections::HashMap;
 pub(crate) use convert::{position_to_offset, RangeExt, ToLocation, ToRangeExt};
 pub use document::Document;
 pub(crate) use document::DocumentVersion;
+use fix::Fixes;
 use lsp_types::{PositionEncodingKind, Url};
 pub(crate) use replacement::Replacement;
 
@@ -70,6 +72,18 @@ impl WorkspaceEditTracker {
         } else {
             Self::Changes(HashMap::default())
         }
+    }
+
+    /// Sets a series of [`Fixes`] for a text document.
+    pub(crate) fn set_fixes_for_document(
+        &mut self,
+        fixes: Fixes,
+        version: DocumentVersion,
+    ) -> crate::Result<()> {
+        for (uri, edits) in fixes {
+            self.set_edits_for_document(uri, version, edits)?;
+        }
+        Ok(())
     }
 
     /// Sets the edits made to a specific document. This should only be called
