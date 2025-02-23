@@ -55,6 +55,11 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             SupportedCodeAction::SourceFixAll => Some(
                 resolve_edit_for_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?,
             ),
+            SupportedCodeAction::QuickFix => {
+                // The client may ask us to resolve a code action, as it has no way of knowing
+                // whether e.g. `command` field will be filled out by the resolution callback.
+                return Ok(action);
+            }
         };
 
         Ok(action)

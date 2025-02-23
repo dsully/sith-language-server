@@ -2,8 +2,10 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req, CodeActionKind, CodeActionOrCommand};
 use rustc_hash::FxHashSet;
 
+use crate::edit::WorkspaceEditTracker;
+use crate::server::api::diagnostics::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
-use crate::DIAGNOSTIC_NAME;
+use crate::SERVER_NAME;
 use crate::{
     server::{client::Notifier, Result, SupportedCodeAction},
     session::DocumentSnapshot,
@@ -28,6 +30,12 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         let mut response = types::CodeActionResponse::default();
 
         let supported_code_actions = supported_code_actions(params.context.only.clone());
+        if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
+            let fixes = fixes_for_diagnostics(params.context.diagnostics)
+                .with_failure_code(ErrorCode::InternalError)?;
+            response
+                .extend(quick_fix(&snapshot, fixes).with_failure_code(ErrorCode::InternalError)?);
+        }
         if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
             response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
@@ -36,6 +44,43 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         }
         Ok(Some(response))
     }
+}
+
+fn quick_fix(
+    snapshot: &DocumentSnapshot,
+    fixes: Vec<DiagnosticFix>,
+) -> crate::Result<Vec<CodeActionOrCommand>> {
+    let document = snapshot.document();
+
+    fixes
+        .iter()
+        .filter(|fix| !fix.edits.is_empty())
+        .map(|fix| {
+            let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
+
+            let document_url = snapshot.url();
+
+            tracker.set_edits_for_document(
+                document_url.clone(),
+                document.version(),
+                fix.edits.clone(),
+            )?;
+
+            Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+                title: format!(
+                    "{SERVER_NAME} ({}): {} | {}-fix",
+                    fix.code, fix.title, fix.applicability
+                ),
+                kind: Some(types::CodeActionKind::QUICKFIX),
+                edit: Some(tracker.into_workspace_edit()),
+                diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
+                data: Some(
+                    serde_json::to_value(document_url).expect("document url should serialize"),
+                ),
+                ..Default::default()
+            }))
+        })
+        .collect()
 }
 
 fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
@@ -53,7 +98,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     };
 
     Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        title: format!("{SERVER_NAME}: Fix all auto-fixable problems"),
         kind: Some(crate::SOURCE_FIX_ALL_SITH),
         edit,
         data,
@@ -79,7 +124,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
     };
 
     Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
+        title: format!("{SERVER_NAME}: Organize imports"),
         kind: Some(crate::SOURCE_ORGANIZE_IMPORTS_SITH),
         edit,
         data,

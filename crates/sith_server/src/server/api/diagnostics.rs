@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use lsp_server::ErrorCode;
 use lsp_types::{
-    CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, Url,
+    CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, TextEdit, Url,
 };
 use semantic_model::declaration::{DeclStmt, DeclarationKind};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,14 @@ use crate::{
     util::{run_ruff_check, UNSUPPORTED_CHECK_ARGS},
 };
 use crate::{server::client::Notifier, session::DocumentSnapshot};
+
+pub(crate) struct DiagnosticFix {
+    pub(crate) fixed_diagnostic: Diagnostic,
+    pub(crate) edits: Vec<TextEdit>,
+    pub(crate) title: String,
+    pub(crate) code: String,
+    pub(crate) applicability: String,
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub(crate) struct RuffLintLocation {
@@ -51,6 +59,7 @@ impl FixEdit {
 pub(crate) struct LintFix {
     pub(crate) applicability: String,
     pub(crate) edits: Vec<FixEdit>,
+    pub(crate) message: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -211,6 +220,7 @@ pub(super) fn generate_ruff_lint_diagnostics(
             }),
             data: lint_diagnostic
                 .fix
+                .filter(|fix| matches!(fix.applicability.as_str(), "safe" | "unsafe"))
                 .map(|fix| serde_json::to_value(fix).unwrap()),
             ..Default::default()
         })
@@ -253,4 +263,38 @@ pub(super) fn clear_diagnostics_for_document(
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
     Ok(())
+}
+
+pub(crate) fn fixes_for_diagnostics(
+    diagnostics: Vec<lsp_types::Diagnostic>,
+) -> crate::Result<Vec<DiagnosticFix>> {
+    diagnostics
+        .into_iter()
+        .map(move |mut diagnostic| {
+            let Some(lsp_types::NumberOrString::String(code)) = diagnostic.code.clone() else {
+                return Ok(None);
+            };
+            let Some(data) = diagnostic.data.take() else {
+                return Ok(None);
+            };
+            let fixed_diagnostic = diagnostic;
+            let associated_data: LintFix = serde_json::from_value(data)
+                .map_err(|err| anyhow::anyhow!("failed to deserialize diagnostic data: {err}"))?;
+            Ok(Some(DiagnosticFix {
+                fixed_diagnostic,
+                code,
+                title: associated_data.message,
+                edits: associated_data
+                    .edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: edit.lsp_range(),
+                        new_text: edit.content,
+                    })
+                    .collect(),
+                applicability: associated_data.applicability,
+            }))
+        })
+        .filter_map(crate::Result::transpose)
+        .collect()
 }

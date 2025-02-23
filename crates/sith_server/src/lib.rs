@@ -13,7 +13,6 @@ mod util;
 
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const SERVER_NAME: &str = "SithLSP";
-pub(crate) const DIAGNOSTIC_NAME: &str = "Sith";
 
 pub(crate) const SOURCE_ORGANIZE_IMPORTS_SITH: CodeActionKind =
     CodeActionKind::new("source.organizeImports.sith");

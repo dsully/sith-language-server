@@ -34,7 +34,6 @@ mod client;
 mod connection;
 mod schedule;
 
-pub(crate) use api::RuffLintDiagnostic;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -270,7 +269,7 @@ impl Server {
             }),
             diagnostic_provider: Some(types::DiagnosticServerCapabilities::Options(
                 DiagnosticOptions {
-                    identifier: Some(crate::DIAGNOSTIC_NAME.into()),
+                    identifier: Some(crate::SERVER_NAME.into()),
                     inter_file_dependencies: false,
                     workspace_diagnostics: false,
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -310,6 +309,10 @@ impl Server {
 /// The code actions we support.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SupportedCodeAction {
+    /// Maps to the `quickfix` code action kind. Quick fix code actions are shown under
+    /// their respective diagnostics. Quick fixes are only created where the fix applicability is
+    /// "safe" or "unsafe".
+    QuickFix,
     /// Maps to `source.organizeImports` and `source.organizeImports.sith` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
     SourceOrganizeImports,
@@ -322,6 +325,7 @@ impl SupportedCodeAction {
     /// Returns the LSP code action kind that map to this code action.
     fn to_kind(self) -> CodeActionKind {
         match self {
+            Self::QuickFix => CodeActionKind::QUICKFIX,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_SITH,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_SITH,
         }
@@ -335,6 +339,11 @@ impl SupportedCodeAction {
 
     /// Returns all code actions kinds that the server currently supports.
     fn all() -> impl Iterator<Item = Self> {
-        [Self::SourceOrganizeImports, Self::SourceFixAll].into_iter()
+        [
+            Self::SourceOrganizeImports,
+            Self::SourceFixAll,
+            Self::QuickFix,
+        ]
+        .into_iter()
     }
 }
