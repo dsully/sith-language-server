@@ -313,6 +313,9 @@ pub(crate) enum SupportedCodeAction {
     /// Maps to `source.organizeImports` and `source.organizeImports.sith` code action kinds.
     /// This is a source action that applies import sorting fixes to the currently open document.
     SourceOrganizeImports,
+    /// Maps to the `source.fixAll` and `source.fixAll.sith` code action kinds.
+    /// This is a source action that applies all safe fixes to the currently open document.
+    SourceFixAll,
 }
 
 impl SupportedCodeAction {
@@ -320,6 +323,7 @@ impl SupportedCodeAction {
     fn to_kind(self) -> CodeActionKind {
         match self {
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_SITH,
+            Self::SourceFixAll => crate::SOURCE_FIX_ALL_SITH,
         }
     }
 
@@ -331,6 +335,6 @@ impl SupportedCodeAction {
 
     /// Returns all code actions kinds that the server currently supports.
     fn all() -> impl Iterator<Item = Self> {
-        [Self::SourceOrganizeImports].into_iter()
+        [Self::SourceOrganizeImports, Self::SourceFixAll].into_iter()
     }
 }

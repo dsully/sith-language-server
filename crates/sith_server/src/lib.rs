@@ -17,6 +17,7 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "Sith";
 
 pub(crate) const SOURCE_ORGANIZE_IMPORTS_SITH: CodeActionKind =
     CodeActionKind::new("source.organizeImports.sith");
+pub(crate) const SOURCE_FIX_ALL_SITH: CodeActionKind = CodeActionKind::new("source.fixAll.sith");
 
 /// A common result type used in most cases where a
 /// result type is needed.

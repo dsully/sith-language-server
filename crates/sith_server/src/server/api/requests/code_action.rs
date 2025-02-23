@@ -9,7 +9,7 @@ use crate::{
     session::DocumentSnapshot,
 };
 
-use super::code_action_resolve::resolve_edit_for_organize_imports;
+use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 
 pub(crate) struct CodeActions;
 
@@ -31,8 +31,34 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
             response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
+        if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
+            response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+        }
         Ok(Some(response))
     }
+}
+
+fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+    let (edit, data) = if snapshot
+        .resolved_client_capabilities()
+        .code_action_deferred_edit_resolution
+    {
+        // The editor will request the edit in a `CodeActionsResolve` request
+        (
+            None,
+            Some(serde_json::to_value(snapshot.url()).expect("document url should serialize")),
+        )
+    } else {
+        (Some(resolve_edit_for_fix_all(snapshot)?), None)
+    };
+
+    Ok(CodeActionOrCommand::CodeAction(types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        kind: Some(crate::SOURCE_FIX_ALL_SITH),
+        edit,
+        data,
+        ..Default::default()
+    }))
 }
 
 fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {

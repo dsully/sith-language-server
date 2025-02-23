@@ -52,10 +52,25 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 resolve_edit_for_organize_imports(&snapshot)
                     .with_failure_code(ErrorCode::InternalError)?,
             ),
+            SupportedCodeAction::SourceFixAll => Some(
+                resolve_edit_for_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?,
+            ),
         };
 
         Ok(action)
     }
+}
+
+pub(super) fn resolve_edit_for_fix_all(
+    snapshot: &DocumentSnapshot,
+) -> crate::Result<types::WorkspaceEdit> {
+    let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
+    tracker.set_fixes_for_document(fix_all_edit(snapshot)?, snapshot.document_version())?;
+    Ok(tracker.into_workspace_edit())
+}
+
+fn fix_all_edit(snapshot: &DocumentSnapshot) -> crate::Result<Fixes> {
+    fix_diagnostics(snapshot, [])
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
