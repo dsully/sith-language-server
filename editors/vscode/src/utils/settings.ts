@@ -72,8 +72,8 @@ export function getWorkspaceSettings(namespace: string, workspace: WorkspaceFold
                 enable: config.get<boolean>("ruff.lint.enable") ?? true,
                 select: config.get<string[]>("ruff.lint.select"),
                 extendSelect: config.get<string[]>("ruff.lint.extendSelect"),
-                ignore: config.get<string[]>("ruff.lint.ignore")
-            }
+                ignore: config.get<string[]>("ruff.lint.ignore"),
+            },
         },
     };
 }
@@ -104,8 +104,8 @@ export function getGlobalSettings(namespace: string): ISettings {
                 enable: getGlobalValue<boolean>(config, "ruff.lint.enable", true),
                 select: getOptionalGlobalValue<string[]>(config, "ruff.lint.select"),
                 extendSelect: getOptionalGlobalValue<string[]>(config, "ruff.lint.extendSelect"),
-                ignore: getOptionalGlobalValue<string[]>(config, "ruff.lint.ignore")
-            }
+                ignore: getOptionalGlobalValue<string[]>(config, "ruff.lint.ignore"),
+            },
         },
         logLevel: config.get<LogLevel>("logLevel"),
         logFile: config.get<string>("logFile"),

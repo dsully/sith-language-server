@@ -122,9 +122,7 @@ export async function findRuffBinaryPath(
  *    which checks the PATH environment variable.
  * 4. If all else fails, return null.
  */
-export async function findSithBinaryPath(
-    settings: ISettings,
-): Promise<string> {
+export async function findSithBinaryPath(settings: ISettings): Promise<string> {
     if (settings.executable) {
         if (await fs.pathExists(settings.executable)) {
             logger.info(`Using 'executable' setting: ${settings.executable}`);

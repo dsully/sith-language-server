@@ -44,19 +44,19 @@ export async function activate(context: ExtensionContext) {
         registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()),
         registerCommand(`${serverId}.executeAutofix`, async () => {
             if (client) {
-              await executeAutofix(client, serverId);
+                await executeAutofix(client, serverId);
             }
-          }),
-          registerCommand(`${serverId}.executeFormat`, async () => {
+        }),
+        registerCommand(`${serverId}.executeFormat`, async () => {
             if (client) {
-              await executeFormat(client, serverId);
+                await executeFormat(client, serverId);
             }
-          }),
-          registerCommand(`${serverId}.executeOrganizeImports`, async () => {
+        }),
+        registerCommand(`${serverId}.executeOrganizeImports`, async () => {
             if (client) {
-              await executeOrganizeImports(client, serverId);
+                await executeOrganizeImports(client, serverId);
             }
-          }),      
+        }),
     );
 
     const runServer = async () => {

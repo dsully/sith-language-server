@@ -5,6 +5,6 @@ export function registerCommand(
     command: string,
     callback: (...args: any[]) => any,
     thisArg?: any,
-  ): Disposable {
+): Disposable {
     return commands.registerCommand(command, callback, thisArg);
-  }
+}
