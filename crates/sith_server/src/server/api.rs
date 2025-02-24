@@ -118,8 +118,8 @@ fn local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, notifier, _, responder| {
-        let result = R::run(session, notifier, params);
+    Ok(Task::local(|session, notifier, requester, responder| {
+        let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
 }
