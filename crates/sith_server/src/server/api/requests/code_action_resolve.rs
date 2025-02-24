@@ -74,7 +74,7 @@ pub(super) fn resolve_edit_for_fix_all(
     Ok(tracker.into_workspace_edit())
 }
 
-fn fix_all_edit(snapshot: &DocumentSnapshot) -> crate::Result<Fixes> {
+pub(super) fn fix_all_edit(snapshot: &DocumentSnapshot) -> crate::Result<Fixes> {
     fix_diagnostics(snapshot, [])
 }
 
@@ -89,7 +89,7 @@ pub(super) fn resolve_edit_for_organize_imports(
     Ok(tracker.into_workspace_edit())
 }
 
-fn organize_imports_edit(snapshot: &DocumentSnapshot) -> crate::Result<Fixes> {
+pub(super) fn organize_imports_edit(snapshot: &DocumentSnapshot) -> crate::Result<Fixes> {
     #[rustfmt::skip]
     let args = [
             "--select",

@@ -3,6 +3,7 @@ mod code_action_resolve;
 mod completion;
 mod diagnostic;
 mod document_highlight;
+mod execute_command;
 mod format;
 mod goto_definition;
 mod hover;
@@ -12,7 +13,7 @@ mod rename;
 
 use super::{
     define_document_url,
-    traits::{BackgroundDocumentRequestHandler, RequestHandler},
+    traits::{BackgroundDocumentRequestHandler, RequestHandler, SyncRequestHandler},
 };
 pub(super) use code_action::CodeActions;
 pub(super) use code_action_resolve::CodeActionResolve;
@@ -20,6 +21,7 @@ pub(super) use completion::resolve::ResolveCompletionItem;
 pub(super) use completion::Completion;
 pub(super) use diagnostic::DocumentDiagnostic;
 pub(super) use document_highlight::DocumentHighlight;
+pub(super) use execute_command::ExecuteCommand;
 pub(super) use format::Format;
 pub(super) use goto_definition::GotoDefinition;
 pub(super) use hover::Hover;

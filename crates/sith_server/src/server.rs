@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::str::FromStr;
 
 use connection::Connection;
 use connection::ConnectionInitializer;
@@ -301,6 +302,14 @@ impl Server {
                     resolve_provider: Some(true),
                 },
             )),
+            execute_command_provider: Some(types::ExecuteCommandOptions {
+                commands: SupportedCommand::all()
+                    .map(|command| command.identifier().to_string())
+                    .collect(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(false),
+                },
+            }),
             ..Default::default()
         }
     }
@@ -345,5 +354,54 @@ impl SupportedCodeAction {
             Self::QuickFix,
         ]
         .into_iter()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Format,
+    FixAll,
+    OrganizeImports,
+}
+
+impl SupportedCommand {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::FixAll => "Fix all auto-fixable problems",
+            Self::Format => "Format document",
+            Self::OrganizeImports => "Format imports",
+        }
+    }
+
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Format => "sith.applyFormat",
+            SupportedCommand::FixAll => "sith.applyAutofix",
+            SupportedCommand::OrganizeImports => "sith.applyOrganizeImports",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    fn all() -> impl Iterator<Item = Self> {
+        [
+            SupportedCommand::Format,
+            SupportedCommand::FixAll,
+            SupportedCommand::OrganizeImports,
+        ]
+        .into_iter()
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "sith.applyAutofix" => Self::FixAll,
+            "sith.applyFormat" => Self::Format,
+            "sith.applyOrganizeImports" => Self::OrganizeImports,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
     }
 }
