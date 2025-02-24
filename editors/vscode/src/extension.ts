@@ -18,6 +18,7 @@ import {
 import { findSithBinaryPath, getProjectRoot } from "./utils/fs";
 import { DEV_SITH_BIN_BUILD_PATH } from "./utils/constants";
 import { registerCommand } from "./utils/vscodeapi";
+import { executeAutofix, executeFormat, executeOrganizeImports } from "./utils/commands";
 
 let client: LanguageClient | undefined;
 let restartInProgress = false;
@@ -41,6 +42,21 @@ export async function activate(context: ExtensionContext) {
             }
         }),
         registerCommand(`${serverId}.showServerLogs`, () => outputChannel.show()),
+        registerCommand(`${serverId}.executeAutofix`, async () => {
+            if (client) {
+              await executeAutofix(client, serverId);
+            }
+          }),
+          registerCommand(`${serverId}.executeFormat`, async () => {
+            if (client) {
+              await executeFormat(client, serverId);
+            }
+          }),
+          registerCommand(`${serverId}.executeOrganizeImports`, async () => {
+            if (client) {
+              await executeOrganizeImports(client, serverId);
+            }
+          }),      
     );
 
     const runServer = async () => {

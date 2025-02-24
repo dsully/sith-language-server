@@ -144,7 +144,29 @@
                     "type": "array"
                 }
             }
-        }
+        },
+        "commands": [
+            {
+              "title": "Fix all auto-fixable problems",
+              "category": "SithLSP",
+              "command": "sith.executeAutofix"
+            },
+            {
+              "title": "Format document",
+              "category": "SithLSP",
+              "command": "sith.executeFormat"
+            },
+            {
+              "title": "Organize imports",
+              "category": "SithLSP",
+              "command": "sith.executeOrganizeImports"
+            },
+            {
+              "title": "Show server logs",
+              "category": "SithLSP",
+              "command": "sith.showServerLogs"
+            }
+          ]      
     },
     "scripts": {
         "compile": "npm run check-types && npm run esbuild-bundle",
