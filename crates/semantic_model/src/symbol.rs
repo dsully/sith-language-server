@@ -37,6 +37,7 @@ bitflags! {
         const PRIVATE = 1 << 0;
         const BUILTIN = 1 << 1;
         const CONSTANT = 1 << 2;
+        const CONTRUCTOR = 1 << 3;
     }
 }
 
@@ -67,6 +68,10 @@ impl Symbol {
 
     pub fn is_constant(&self) -> bool {
         self.flags.contains(SymbolFlags::CONSTANT)
+    }
+
+    pub fn is_constructor(&self) -> bool {
+        self.flags.contains(SymbolFlags::CONTRUCTOR)
     }
 
     pub fn set_declaration_id(&mut self, decl_id: SymbolDeclarations) {

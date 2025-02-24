@@ -279,6 +279,9 @@ impl<'a> SymbolTableBuilder<'a> {
             if name.chars().all(|c| c.is_uppercase()) {
                 symbol.set_flag(SymbolFlags::CONSTANT)
             }
+            if self.flags.contains(VisitorFlags::IN_CLASS) && name == "__init__" {
+                symbol.set_flag(SymbolFlags::CONTRUCTOR);
+            }
 
             let symbol_id = self.table.symbols.insert(symbol);
             scope.add_symbol(name, symbol_id);
