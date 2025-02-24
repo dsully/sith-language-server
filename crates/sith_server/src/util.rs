@@ -121,7 +121,7 @@ where
 {
     execute_ruff_command(
         ruff_path,
-        ["--force-exclude", "--quiet", "--stdin-filename"]
+        ["format", "--force-exclude", "--quiet", "--stdin-filename"]
             .iter()
             .copied()
             .chain(std::iter::once(filename))
