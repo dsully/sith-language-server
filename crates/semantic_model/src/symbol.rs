@@ -7,6 +7,7 @@ use crate::{
 };
 
 #[newtype_index]
+#[derive(Ord, PartialOrd)]
 pub struct SymbolId;
 
 impl SymbolId {

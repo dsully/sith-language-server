@@ -310,6 +310,7 @@ impl Server {
                     work_done_progress: Some(false),
                 },
             }),
+            document_symbol_provider: Some(OneOf::Left(true)),
             ..Default::default()
         }
     }

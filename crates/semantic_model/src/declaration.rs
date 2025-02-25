@@ -136,6 +136,13 @@ impl Declaration {
         )
     }
 
+    pub fn is_parameter(&self) -> bool {
+        matches!(
+            self.kind,
+            DeclarationKind::Parameter | DeclarationKind::InstanceParameter(_)
+        )
+    }
+
     /// Returns the path to the source file for import-related declarations,
     /// with preference given to stub sources over non-stub sources when available.
     pub fn import_source(&self) -> Option<&PathBuf> {

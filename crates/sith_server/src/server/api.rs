@@ -75,6 +75,9 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
         }
         request::ExecuteCommand::METHOD => local_request_task::<request::ExecuteCommand>(req),
+        request::DocumentSymbol::METHOD => {
+            background_request_task::<request::DocumentSymbol>(req, BackgroundSchedule::Worker)
+        }
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();

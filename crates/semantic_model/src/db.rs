@@ -9,9 +9,7 @@ use bimap::BiHashMap;
 use python_ast::{ModModule, Suite};
 use python_ast_utils::nodes::NodeStack;
 use python_parser::{parse_module, Parsed};
-use python_utils::{
-    PythonHost, ROOT_FILES,
-};
+use python_utils::{PythonHost, ROOT_FILES};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
@@ -441,7 +439,6 @@ impl SymbolTableDb {
         }
     }
 
-    // TODO: maybe this should return an Option
     pub fn symbol(&self, file: &PathBuf, symbol_id: SymbolId) -> &Symbol {
         self.table(file)
             .symbol(symbol_id)

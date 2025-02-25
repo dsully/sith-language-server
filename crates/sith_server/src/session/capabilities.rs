@@ -7,6 +7,7 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) pull_diagnostics: bool,
     pub(crate) completion_item_resolve_properties_support: Vec<String>,
     pub(crate) document_changes: bool,
+    pub(crate) hierarchical_symbols: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -50,6 +51,12 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace| workspace.workspace_edit.as_ref())
             .and_then(|workspace_edit| workspace_edit.document_changes)
             .unwrap_or_default();
+        let hierarchical_symbols = client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.document_symbol.as_ref())
+            .and_then(|document_symbol| document_symbol.hierarchical_document_symbol_support)
+            .unwrap_or_default();
 
         Self {
             code_action_deferred_edit_resolution: code_action_data_support
@@ -58,6 +65,7 @@ impl ResolvedClientCapabilities {
             pull_diagnostics,
             completion_item_resolve_properties_support,
             document_changes,
+            hierarchical_symbols,
         }
     }
 }
