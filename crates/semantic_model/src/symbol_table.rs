@@ -216,19 +216,16 @@ impl<'a> SymbolTableBuilder<'a> {
         // - We identify this case by checking if we're in an instance attribute assignment
         // - The parent scope (class scope) is retrieved to store the attribute
         // Otherwise, use the current scope for regular variable declarations
-        let scope = if self
+        let is_instance_attr_assign = self
             .flags
-            .contains(VisitorFlags::IN_INSTANCE_ATTR_ASSIGNMENT)
-        {
+            .contains(VisitorFlags::IN_INSTANCE_ATTR_ASSIGNMENT);
+
+        let scope = if is_instance_attr_assign {
             self.flags.remove(VisitorFlags::IN_INSTANCE_ATTR_ASSIGNMENT);
-            let parent_id = self
-                .table
+            self.table
                 .scope(self.curr_scope)
                 .and_then(|scope| scope.parent())
-                .unwrap();
-            self.table
-                .scopes
-                .get_mut(parent_id)
+                .and_then(|parent_id| self.table.scopes.get_mut(parent_id))
                 .expect("Couldn't find scope for parent id!")
         } else {
             self.table
@@ -281,6 +278,9 @@ impl<'a> SymbolTableBuilder<'a> {
             }
             if self.flags.contains(VisitorFlags::IN_CLASS) && name == "__init__" {
                 symbol.set_flag(SymbolFlags::CONTRUCTOR);
+            }
+            if is_instance_attr_assign {
+                symbol.set_flag(SymbolFlags::CLASS_FIELD);
             }
 
             let symbol_id = self.table.symbols.insert(symbol);

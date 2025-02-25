@@ -38,6 +38,7 @@ bitflags! {
         const BUILTIN = 1 << 1;
         const CONSTANT = 1 << 2;
         const CONTRUCTOR = 1 << 3;
+        const CLASS_FIELD = 1 << 4;
     }
 }
 
@@ -72,6 +73,10 @@ impl Symbol {
 
     pub fn is_constructor(&self) -> bool {
         self.flags.contains(SymbolFlags::CONTRUCTOR)
+    }
+
+    pub fn is_class_field(&self) -> bool {
+        self.flags.contains(SymbolFlags::CLASS_FIELD)
     }
 
     pub fn set_declaration_id(&mut self, decl_id: SymbolDeclarations) {
