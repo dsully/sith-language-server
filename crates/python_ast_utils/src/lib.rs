@@ -5,7 +5,7 @@ use std::borrow::Borrow;
 use nodes::{NodeWithParent, Nodes};
 use python_ast::{
     visitor::{self, Visitor},
-    AnyNodeRef, Expr, Stmt,
+    AnyNodeRef, AttributeExpr, CallExpr, ClassDefStmt, Expr, FunctionDefStmt, NameExpr, Stmt,
 };
 use ruff_python_resolver::module_descriptor::ImportModuleDescriptor;
 use ruff_source_file::LineIndex;
@@ -167,5 +167,24 @@ where
             Stmt::Return(return_stmt) => self.returns.push(return_stmt),
             _ => visitor::walk_stmt(self, stmt),
         }
+    }
+}
+
+pub fn is_class_or_function_deprecated(node: &AnyNodeRef) -> bool {
+    match node {
+        AnyNodeRef::StmtClassDef(ClassDefStmt { decorator_list, .. })
+        | AnyNodeRef::StmtFunctionDef(FunctionDefStmt { decorator_list, .. }) => decorator_list
+            .iter()
+            .any(|decorator| is_deprecated_annotation(&decorator.expression)),
+        _ => false,
+    }
+}
+
+fn is_deprecated_annotation(node: &Expr) -> bool {
+    match node {
+        Expr::Name(NameExpr { id, .. }) if id == "deprecated" => true,
+        Expr::Attribute(AttributeExpr { attr, .. }) if attr == "deprecated" => true,
+        Expr::Call(CallExpr { func, .. }) => is_deprecated_annotation(func),
+        _ => false,
     }
 }
