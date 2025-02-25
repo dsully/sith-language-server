@@ -70,7 +70,7 @@ impl Scope {
         &'db self,
         db: &'db SymbolTableDb,
         path: &'path PathBuf,
-    ) -> impl Iterator<Item = &Scope> + use<'db, 'path> {
+    ) -> impl Iterator<Item = &'db Scope> + use<'db, 'path> {
         std::iter::successors(Some(self), |&scope| {
             scope.parent().map(|scope_id| db.scope(path, scope_id))
         })
