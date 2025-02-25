@@ -404,11 +404,10 @@ impl SymbolTableDb {
 
     pub fn with_builtin_symbols(mut self) -> Self {
         let builtins_path = self.indexer().typeshed_path().join("stdlib/builtins.pyi");
-        let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file to exist");
+        let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file not found");
 
         let file_id = self.indexer_mut().push_file(builtins_path.clone());
-        let (table, parsed_file, resolved_paths) =
-            self.indexer_mut().index_content(file_id, &content);
+        let (table, parsed_file, _) = self.indexer_mut().index_content(file_id, &content);
 
         self.builtin_symbol_table = BuiltinSymbolTable {
             table,
@@ -416,8 +415,6 @@ impl SymbolTableDb {
             path: builtins_path,
         };
 
-        let file_ids = self.indexer_mut().push_file_ids(resolved_paths);
-        self.indexer_mut().index_files(file_ids);
 
         self
     }
