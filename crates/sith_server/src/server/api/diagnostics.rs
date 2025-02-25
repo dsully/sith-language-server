@@ -66,7 +66,8 @@ pub(crate) struct LintFix {
 pub(crate) struct RuffLintDiagnostic {
     pub(crate) filename: PathBuf,
     pub(crate) message: String,
-    pub(crate) code: String,
+    /// This is `None` when there's a syntax error in the code being checked.
+    pub(crate) code: Option<String>,
     pub(crate) location: RuffLintLocation,
     pub(crate) end_location: RuffLintLocation,
     pub(crate) url: Option<Url>,
@@ -212,7 +213,7 @@ pub(super) fn generate_ruff_lint_diagnostics(
         .map(|lint_diagnostic| Diagnostic {
             range: lint_diagnostic.lsp_range(),
             message: lint_diagnostic.message,
-            code: Some(NumberOrString::String(lint_diagnostic.code)),
+            code: Some(NumberOrString::String(lint_diagnostic.code.unwrap())),
             severity: Some(DiagnosticSeverity::WARNING),
             source: Some("ruff".into()),
             code_description: Some(CodeDescription {
