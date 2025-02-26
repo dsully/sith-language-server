@@ -136,20 +136,25 @@ pub struct Indexer {
     tables: FxHashMap<FileId, SymbolTable>,
     asts: FxHashMap<FileId, Parsed<ModModule>>,
     files: Files,
+    builtin_symbol_table: BuiltinSymbolTable,
 
     exec_env: ExecutionEnvironment,
     config: Config,
     host: PythonHost,
 
     was_root_path_indexed: bool,
+    collection_stub_path: PathBuf,
 }
 
 impl Indexer {
     fn new(root: PathBuf, python_host: PythonHost) -> Self {
+        let typeshed_path = setup_typeshed();
         Self {
             tables: FxHashMap::default(),
             asts: FxHashMap::default(),
             files: Files::default(),
+            builtin_symbol_table: BuiltinSymbolTable::default(),
+            collection_stub_path: typeshed_path.join("stdlib/collections/__init__.pyi"),
             exec_env: ExecutionEnvironment {
                 root,
                 python_version: python_host.version,
@@ -159,7 +164,7 @@ impl Indexer {
             },
             config: Config {
                 // TODO: add settings option in the LSP for this
-                typeshed_path: Some(setup_typeshed()),
+                typeshed_path: Some(typeshed_path),
                 stub_path: None,
                 venv_path: None,
                 venv: None,
@@ -274,6 +279,30 @@ impl Indexer {
         }
     }
 
+    fn index_builtin_symbols(&mut self) {
+        let builtins_path = self.typeshed_path().join("stdlib/builtins.pyi");
+        let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file not found");
+
+        let file_id = self.push_file(builtins_path.clone());
+        let (table, parsed_file, _) = self.index_content(file_id, &content);
+
+        self.builtin_symbol_table = BuiltinSymbolTable {
+            table,
+            ast: parsed_file,
+            path: builtins_path,
+        };
+    }
+
+    fn index_collection_types(&mut self) {
+        let content = fs::read_to_string(&self.collection_stub_path)
+            .expect("collections/__init__.pyi file not found");
+
+        let file_id = self.push_file(self.collection_stub_path.clone());
+        let (table, parsed_file, _) = self.index_content(file_id, &content);
+        self.tables.insert(file_id, table);
+        self.asts.insert(file_id, parsed_file);
+    }
+
     pub fn tables(&self) -> impl Iterator<Item = (&FileId, &SymbolTable)> {
         self.tables.iter()
     }
@@ -383,14 +412,12 @@ impl Indexer {
 #[derive(Debug, Clone)]
 pub struct SymbolTableDb {
     index: Indexer,
-    builtin_symbol_table: BuiltinSymbolTable,
 }
 
 impl SymbolTableDb {
     pub fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
             index: Indexer::new(root, python_host),
-            builtin_symbol_table: BuiltinSymbolTable::default(),
         }
     }
 
@@ -403,36 +430,32 @@ impl SymbolTableDb {
     }
 
     pub fn with_builtin_symbols(mut self) -> Self {
-        let builtins_path = self.indexer().typeshed_path().join("stdlib/builtins.pyi");
-        let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file not found");
+        self.indexer_mut().index_builtin_symbols();
+        self
+    }
 
-        let file_id = self.indexer_mut().push_file(builtins_path.clone());
-        let (table, parsed_file, _) = self.indexer_mut().index_content(file_id, &content);
-
-        self.builtin_symbol_table = BuiltinSymbolTable {
-            table,
-            ast: parsed_file,
-            path: builtins_path,
-        };
-
-
+    pub fn with_collection_types(mut self) -> Self {
+        self.indexer_mut().index_collection_types();
         self
     }
 
     pub fn builtin_symbols(&self) -> &BuiltinSymbolTable {
-        &self.builtin_symbol_table
+        &self.indexer().builtin_symbol_table
+    }
+
+    pub fn collection_stub_symbol_table(&self) -> &SymbolTable {
+        self.table(self.collection_stub_path())
+    }
+
+    pub fn collection_stub_path(&self) -> &PathBuf {
+        &self.index.collection_stub_path
     }
 
     pub fn table(&self, file: &PathBuf) -> &SymbolTable {
         match self.indexer().tables.get(&self.indexer().file_id(file)) {
             Some(table) => table,
-            None => {
-                if file.ends_with("stdlib/builtins.pyi") {
-                    &self.builtin_symbol_table.table
-                } else {
-                    panic!("no symbol table for path: {}", file.display());
-                }
-            }
+            None if file.ends_with("stdlib/builtins.pyi") => &self.builtin_symbols().table,
+            _ => panic!("no symbol table for path: {}", file.display()),
         }
     }
 

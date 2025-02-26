@@ -55,7 +55,11 @@ pub(crate) struct SymbolTableDbController {
 impl SymbolTableDbController {
     pub fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
-            table: Arc::new(SymbolTableDb::new(root, python_host).with_builtin_symbols()),
+            table: Arc::new(
+                SymbolTableDb::new(root, python_host)
+                    .with_builtin_symbols()
+                    .with_collection_types(),
+            ),
         }
     }
 
