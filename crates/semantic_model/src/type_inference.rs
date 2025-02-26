@@ -164,7 +164,7 @@ impl ClassBase {
         }
     }
 
-    pub(crate) fn into_class(self) -> Option<ClassType> {
+    pub fn into_class(self) -> Option<ClassType> {
         match self {
             ClassBase::Class(class) => Some(class),
             ClassBase::Unknown => None,

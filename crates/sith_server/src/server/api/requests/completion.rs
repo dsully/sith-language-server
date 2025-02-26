@@ -17,6 +17,7 @@ use semantic_model::{
     builtins::BUILTIN_KEYWORDS,
     db::{FileId, SymbolTableDb},
     declaration::{DeclId, DeclStmt, DeclarationKind, DeclarationQuery},
+    mro::compute_mro,
     type_inference::{PythonType, ResolvedType, TypeInferer},
     Scope, ScopeId, Symbol,
 };
@@ -661,34 +662,27 @@ fn get_completion_candidates(
         PositionCtx::AttrAccess(expr, scope_id) => {
             let mut type_inferer = TypeInferer::new(db, *scope_id, path);
             match type_inferer.infer_expr(*expr, nodes) {
-                ResolvedType::KnownType(PythonType::Class(class)) => {
-                    let path = db.indexer().file_path(&class.file_id);
-                    let scope = db.scope(path, class.body_scope);
-                    completion_candidates =
-                        get_completion_candidates_from_scope(db, path, scope).collect();
-
-                    fn process_base_classes(
-                        db: &SymbolTableDb,
-                        base_classes: &[ResolvedType],
-                        completion_candidates: &mut Vec<CompletionItemCandidate>,
-                    ) {
-                        for resolved_type in base_classes {
-                            let ResolvedType::KnownType(PythonType::Class(class)) = resolved_type
-                            else {
-                                continue;
-                            };
-                            let path = db.indexer().file_path(&class.file_id);
-                            let body_scope = db.scope(path, class.body_scope);
-                            completion_candidates
-                                .extend(get_completion_candidates_from_scope(db, path, body_scope));
-
-                            // Recursively process nested base classes
-                            process_base_classes(db, &class.class_bases(db), completion_candidates);
+                ResolvedType::KnownType(PythonType::Class(class)) => match compute_mro(db, class) {
+                    Ok(class_bases) => {
+                        for class_base in class_bases
+                            .into_iter()
+                            .filter_map(|class_base| class_base.into_class())
+                        {
+                            let class_path = db.indexer().file_path(&class_base.file_id);
+                            let body_scope = db.scope(class_path, class_base.body_scope);
+                            completion_candidates.extend(get_completion_candidates_from_scope(
+                                db, class_path, body_scope,
+                            ));
                         }
                     }
-
-                    process_base_classes(db, &class.class_bases(db), &mut completion_candidates);
-                }
+                    Err(err_msg) => {
+                        let path = db.indexer().file_path(&class.file_id);
+                        tracing::error!(
+                            "Failed to compute MRO of class ('{}'): {err_msg}",
+                            db.symbol_name(path, class.symbol_id)
+                        );
+                    }
+                },
                 ResolvedType::KnownType(PythonType::Module(file_id)) => {
                     let module_path = db.indexer().file_path(&file_id);
                     let scope = db.scope(module_path, ScopeId::global());

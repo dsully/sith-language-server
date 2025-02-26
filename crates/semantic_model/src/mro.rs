@@ -7,7 +7,8 @@ use crate::{
     type_inference::{ClassBase, ClassType, KnownClass},
 };
 
-pub(crate) fn compute_mro(db: &SymbolTableDb, class: ClassType) -> Result<Vec<ClassBase>, String> {
+// TODO: return a proper error type instead of a string
+pub fn compute_mro(db: &SymbolTableDb, class: ClassType) -> Result<Vec<ClassBase>, String> {
     let class_bases = class.class_bases(db);
 
     if !class_bases.is_empty() && class.is_cyclically_defined(db) {
