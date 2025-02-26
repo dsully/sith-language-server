@@ -347,10 +347,15 @@ impl Indexer {
     }
 
     pub fn ast(&self, file: &PathBuf) -> &Parsed<ModModule> {
-        self.files
+        match self
+            .files
             .get_by_path(file)
             .and_then(|file_id| self.asts.get(file_id))
-            .expect("AST for provided file")
+        {
+            Some(ast) => ast,
+            None if file.ends_with("stdlib/builtins.pyi") => &self.builtin_symbol_table.ast,
+            _ => panic!("no ast for path: {}", file.display()),
+        }
     }
 
     pub fn node_stack(&self, file: &PathBuf) -> NodeStack {
