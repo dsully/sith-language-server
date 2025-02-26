@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    hash::Hash,
+    path::{Path, PathBuf},
+};
 
 use lsp_types::{
     self as types,
@@ -13,6 +16,7 @@ use python_ast_utils::{
 use python_utils::get_python_module_names_in_path;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 use semantic_model::{
     builtins::BUILTIN_KEYWORDS,
     db::{FileId, SymbolTableDb},
@@ -71,7 +75,7 @@ impl CompletionItemData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 struct CompletionItemSymbolData {
     file_id: FileId,
     declaration_id: DeclId,
@@ -88,7 +92,7 @@ impl CompletionItemSymbolData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 struct CompletionItemModuleData {
     path: PathBuf,
 }
@@ -99,17 +103,30 @@ impl CompletionItemModuleData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 enum CompletionItemDataPayload {
     Module(CompletionItemModuleData),
     Symbol(CompletionItemSymbolData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 struct CompletionItemCandidate {
     label: String,
     kind: CompletionItemKind,
     data: Option<CompletionItemDataPayload>,
+}
+
+impl Hash for CompletionItemCandidate {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.label.hash(state);
+        self.kind.hash(state);
+    }
+}
+
+impl PartialEq for CompletionItemCandidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label && self.kind == other.kind
+    }
 }
 
 impl CompletionItemCandidate {
@@ -419,8 +436,8 @@ fn get_completion_candidates_from_scope_and_parents<'a>(
 
 fn get_thirdparty_and_builtin_modules_candidates(
     db: &SymbolTableDb,
-) -> Vec<CompletionItemCandidate> {
-    let mut module_names = Vec::new();
+) -> FxHashSet<CompletionItemCandidate> {
+    let mut module_names = FxHashSet::default();
     for search_path in db.indexer().python_search_paths() {
         module_names.extend(
             get_python_module_names_in_path(search_path)
@@ -433,7 +450,7 @@ fn get_thirdparty_and_builtin_modules_candidates(
     module_names
 }
 
-fn get_python_module_candidates(path: impl AsRef<Path>) -> Vec<CompletionItemCandidate> {
+fn get_python_module_candidates(path: impl AsRef<Path>) -> FxHashSet<CompletionItemCandidate> {
     get_python_module_names_in_path(path)
         .into_iter()
         .map(|(module_name, module_path)| CompletionItemCandidate::module(module_name, module_path))
@@ -479,7 +496,7 @@ fn get_completion_candidates(
     nodes: &Nodes,
     scope: ScopeId,
 ) -> Option<Vec<CompletionItem>> {
-    let mut completion_candidates = Vec::new();
+    let mut completion_candidates = FxHashSet::default();
 
     // Don't show the bultin symbols in the following contexts
     if !matches!(
@@ -651,7 +668,7 @@ fn get_completion_candidates(
                 .iter_non_variadic_params()
                 .map(|pwd| &pwd.parameter)
             {
-                completion_candidates.push(CompletionItemCandidate::parameter(&param.name))
+                completion_candidates.insert(CompletionItemCandidate::parameter(&param.name));
             }
 
             let scope = db.scope(path, scope);
