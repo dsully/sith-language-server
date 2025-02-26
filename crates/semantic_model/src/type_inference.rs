@@ -53,6 +53,12 @@ pub enum KnownClass {
     Set,
     FrozenSet,
     Dict,
+    // typing/collection
+    Counter,
+    DefaultDict,
+    Deque,
+    ChainMap,
+    OrderedDict,
 }
 
 impl KnownClass {
@@ -71,20 +77,39 @@ impl KnownClass {
             "frozenset" => Self::Set,
             "dict" => Self::Dict,
             "list" => Self::List,
+            "Counter" => Self::Counter,
+            "defaultdict" => Self::DefaultDict,
+            "deque" => Self::Deque,
+            "ChainMap" => Self::ChainMap,
+            "OrderedDict" => Self::OrderedDict,
             _ => return None,
         })
     }
 
     fn create_builtin_type(db: &SymbolTableDb, known: KnownClass) -> ClassType {
-        let decl = db
+        let declaration = db
             .builtin_symbols()
             .symbol_declaration(known.as_str())
-            .expect("to find class declaration");
+            .expect("class declaration not found");
         ClassType {
             file_id: db.indexer().file_id(db.builtin_symbols().path()),
-            node_id: decl.node_id,
-            symbol_id: decl.symbol_id,
-            body_scope: decl.body_scope().unwrap(),
+            node_id: declaration.node_id,
+            symbol_id: declaration.symbol_id,
+            body_scope: declaration.body_scope().unwrap(),
+            known: Some(known),
+        }
+    }
+
+    fn create_collection_type(db: &SymbolTableDb, known: KnownClass) -> ClassType {
+        let declaration = db
+            .collection_stub_symbol_table()
+            .symbol_declaration(known.as_str(), ScopeId::global(), DeclarationQuery::Last)
+            .expect("collection class declaration not found");
+        ClassType {
+            file_id: db.indexer().file_id(db.collection_stub_path()),
+            node_id: declaration.node_id,
+            symbol_id: declaration.symbol_id,
+            body_scope: declaration.body_scope().unwrap(),
             known: Some(known),
         }
     }
@@ -124,11 +149,16 @@ impl KnownClass {
             KnownClass::Set => "set",
             KnownClass::FrozenSet => "frozenset",
             KnownClass::Dict => "dict",
+            KnownClass::Counter => "Counter",
+            KnownClass::DefaultDict => "defaultdict",
+            KnownClass::Deque => "deque",
+            KnownClass::ChainMap => "ChainMap",
+            KnownClass::OrderedDict => "OrderedDict",
         }
     }
 }
 
-// TODO: add type for class instances
+// TODO: add type for class instance and class type
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PythonType {
     Module(FileId),
@@ -605,38 +635,31 @@ impl<'db> TypeInferer<'db> {
 
     fn handle_typing_stub_assignment_or_annotation(&mut self, node: AnyNodeRef) -> ResolvedType {
         match node {
-            AnyNodeRef::StmtAssign(python_ast::AssignStmt { targets, range, .. }) => {
+            AnyNodeRef::StmtAssign(python_ast::AssignStmt { targets, .. }) => {
                 let [target, ..] = targets.as_slice() else {
                     unreachable!()
                 };
 
                 let collection_name = &target.as_name_expr().expect("name expression").id;
-                let collection_declaration = self
-                    .db
-                    .symbol_declaration(
-                        self.path,
-                        collection_name,
-                        self.curr_scope,
-                        DeclarationQuery::AtOffset(range.start().to_u32()),
-                    )
-                    .unwrap();
-                let alias_declaration = self
-                    .db
-                    .symbol_declaration(
-                        self.path,
-                        "_Alias",
-                        self.curr_scope,
-                        DeclarationQuery::Last,
-                    )
-                    .unwrap();
+                let class_type = match collection_name.as_str() {
+                    "List" => KnownClass::list(self.db),
+                    "Tuple" => KnownClass::tuple(self.db),
+                    "Set" => KnownClass::set(self.db),
+                    "Dict" => KnownClass::tuple(self.db),
+                    "FrozenSet" => KnownClass::create_builtin_type(self.db, KnownClass::FrozenSet),
+                    "Counter" => KnownClass::create_collection_type(self.db, KnownClass::Counter),
+                    "DefaultDict" => {
+                        KnownClass::create_collection_type(self.db, KnownClass::DefaultDict)
+                    }
+                    "Deque" => KnownClass::create_collection_type(self.db, KnownClass::Deque),
+                    "ChainMap" => KnownClass::create_collection_type(self.db, KnownClass::ChainMap),
+                    "OrderedDict" => {
+                        KnownClass::create_collection_type(self.db, KnownClass::OrderedDict)
+                    }
+                    _ => unreachable!(),
+                };
 
-                ResolvedType::KnownType(PythonType::Class(ClassType {
-                    file_id: self.db.indexer().file_id(self.path),
-                    node_id: alias_declaration.node_id,
-                    symbol_id: collection_declaration.symbol_id,
-                    body_scope: alias_declaration.body_scope().unwrap(),
-                    known: None,
-                }))
+                ResolvedType::KnownType(PythonType::Class(class_type))
             }
             AnyNodeRef::StmtAnnAssign(python_ast::AnnAssignStmt { target, range, .. }) => {
                 let special_type_name = &target.as_name_expr().expect("name expression").id;
@@ -716,31 +739,25 @@ impl<'db> TypeInferer<'db> {
                 .reduce(ResolvedType::union)
                 .unwrap_or(ResolvedType::Unknown),
             AnyNodeRef::UnaryOpExpr(python_ast::UnaryOpExpr { op, operand, .. }) => match op {
-                UnaryOp::Invert => {
-                    return match self.infer_expr(operand.as_ref(), nodes) {
-                        ResolvedType::KnownType(PythonType::Number(
-                            NumberLike::Bool | NumberLike::Int,
-                        )) => ResolvedType::KnownType(PythonType::Number(NumberLike::Int)),
-                        ResolvedType::KnownType(_) => ResolvedType::TypeError,
-                        _ => ResolvedType::Unknown,
-                    }
-                }
+                UnaryOp::Invert => match self.infer_expr(operand.as_ref(), nodes) {
+                    ResolvedType::KnownType(PythonType::Number(
+                        NumberLike::Bool | NumberLike::Int,
+                    )) => ResolvedType::KnownType(PythonType::Number(NumberLike::Int)),
+                    ResolvedType::KnownType(_) => ResolvedType::TypeError,
+                    _ => ResolvedType::Unknown,
+                },
                 UnaryOp::Not => ResolvedType::KnownType(PythonType::Number(NumberLike::Bool)),
-                UnaryOp::UAdd | UnaryOp::USub => {
-                    return match self.infer_expr(operand.as_ref(), nodes) {
-                        ResolvedType::KnownType(PythonType::Number(number)) => {
-                            ResolvedType::KnownType(PythonType::Number(
-                                if number == NumberLike::Bool {
-                                    NumberLike::Int
-                                } else {
-                                    number
-                                },
-                            ))
-                        }
-                        ResolvedType::KnownType(_) => ResolvedType::TypeError,
-                        _ => ResolvedType::Unknown,
+                UnaryOp::UAdd | UnaryOp::USub => match self.infer_expr(operand.as_ref(), nodes) {
+                    ResolvedType::KnownType(PythonType::Number(number)) => {
+                        ResolvedType::KnownType(PythonType::Number(if number == NumberLike::Bool {
+                            NumberLike::Int
+                        } else {
+                            number
+                        }))
                     }
-                }
+                    ResolvedType::KnownType(_) => ResolvedType::TypeError,
+                    _ => ResolvedType::Unknown,
+                },
             },
             AnyNodeRef::BinOpExpr(python_ast::BinOpExpr {
                 left, op, right, ..
@@ -1324,7 +1341,8 @@ mod tests {
     fn setup_db(src: &str, root: &Path, path: &Path) -> crate::db::SymbolTableDb {
         let interpreter = resolve_python_interpreter(root).expect("Valid python interpreter");
         let mut db = SymbolTableDb::new(root.to_path_buf(), PythonHost::new(interpreter))
-            .with_builtin_symbols();
+            .with_builtin_symbols()
+            .with_collection_types();
         db.indexer_mut()
             .add_or_update_file(path.to_path_buf(), Source::New(src));
         db
@@ -1477,7 +1495,7 @@ import typing
 
 reveal_type(typing.List[typing.Union[int, str]])
 "#;
-        assert_type(src, "./test.py", "class[List]")
+        assert_type(src, "./test.py", "class[list]")
     }
 
     #[test]
