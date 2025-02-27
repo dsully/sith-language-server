@@ -475,6 +475,8 @@ fn builtin_completion_candidates(
 
             // don't show imported symbols from the builtin.pyi file
             if declaration.is_import() {
+                None
+            } else {
                 get_completion_item_kind(db, db.builtin_symbols().path(), symbol).map(|item_kind| {
                     CompletionItemCandidate::builtin(
                         symbol_name.to_string(),
@@ -483,8 +485,6 @@ fn builtin_completion_candidates(
                         declaration_id,
                     )
                 })
-            } else {
-                None
             }
         })
 }
