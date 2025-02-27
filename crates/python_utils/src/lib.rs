@@ -46,7 +46,7 @@ pub fn get_python_version(interpreter_path: impl AsRef<Path>) -> anyhow::Result<
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to get python version!"))?;
 
-    let output_str = String::from_utf8(output.stdout).expect("python output is not valid UTF-8");
+    let output_str = String::from_utf8_lossy(&output.stdout);
     let output_segments = output_str.split(" ").collect::<Vec<&str>>();
     let version_output = output_segments
         .get(1)
@@ -91,7 +91,8 @@ pub fn get_python_search_paths(
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to execute python command"))?;
 
-    let json_str = String::from_utf8(output.stdout).expect("python output is not valid UTF-8");
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    // TODO: don't use `expect` here
     let result: PythonPathResult =
         serde_json::from_str(&json_str).expect("failed to deserialize JSON");
 
