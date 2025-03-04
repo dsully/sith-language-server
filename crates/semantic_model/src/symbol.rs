@@ -40,6 +40,7 @@ bitflags! {
         const CONSTANT = 1 << 2;
         const CONTRUCTOR = 1 << 3;
         const CLASS_FIELD = 1 << 4;
+        const MODULE = 1 << 5;
     }
 }
 
@@ -78,6 +79,10 @@ impl Symbol {
 
     pub fn is_class_field(&self) -> bool {
         self.flags.contains(SymbolFlags::CLASS_FIELD)
+    }
+
+    pub fn is_module(&self) -> bool {
+        self.flags.contains(SymbolFlags::MODULE)
     }
 
     pub fn set_declaration_id(&mut self, decl_id: SymbolDeclarations) {

@@ -269,6 +269,7 @@ impl<'a> SymbolTableBuilder<'a> {
             symbol.push_declaration_id(decl_id);
             symbol_id
         } else {
+            let declaration = self.table.decls.get(decl_id).unwrap();
             let mut symbol = Symbol::new(self.curr_scope, SymbolDeclarations::single(decl_id));
 
             if self.file_info.is_builtin_stub_file {
@@ -285,6 +286,11 @@ impl<'a> SymbolTableBuilder<'a> {
             }
             if is_instance_attr_assign {
                 symbol.set_flag(SymbolFlags::CLASS_FIELD);
+            }
+            if let Some(path) = declaration.import_source().and_then(ImportSource::any_path) {
+                if is_python_module(name, path) {
+                    symbol.set_flag(SymbolFlags::MODULE);
+                }
             }
 
             let symbol_id = self.table.symbols.insert(symbol);
