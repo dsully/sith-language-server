@@ -39,6 +39,36 @@ pub fn get_python_platform() -> anyhow::Result<PythonPlatform> {
     })
 }
 
+pub fn get_python_doc(
+    interpreter_path: impl AsRef<Path>,
+    search_term: &str,
+) -> anyhow::Result<Option<String>> {
+    let output = Command::new(interpreter_path.as_ref())
+        .args([
+            "-c",
+            [
+                "import pydoc",
+                "pydoc.pager=pydoc.plainpager",
+                &format!("pydoc.help('{search_term}')"),
+            ]
+            .join(";")
+            .as_str(),
+        ])
+        .stdout(Stdio::piped())
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to get python documentation! {e}"))?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    if output_str.starts_with("No Python documentation found for") {
+        Ok(None)
+    } else {
+        Ok(Some(
+            // Skip the line with "Help on ..."
+            output_str.lines().skip(1).collect::<Vec<&str>>().join("\n"),
+        ))
+    }
+}
+
 pub fn get_python_version(interpreter_path: impl AsRef<Path>) -> anyhow::Result<PythonVersion> {
     let output = Command::new(interpreter_path.as_ref())
         .arg("--version")

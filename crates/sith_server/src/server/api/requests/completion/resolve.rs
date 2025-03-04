@@ -81,6 +81,16 @@ fn get_completion_item_documentation(
         }
         CompletionItemDataPayload::Symbol(completion_item_symbol_data) => {
             match completion_item_symbol_data.origin() {
+                CompletionItemOrigin::Builtin => {
+                    let interpreter = snapshot.client_settings().interpreter()?;
+                    match get_python_doc(interpreter, &original_completion.label) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            tracing::error!("Failed to get documentation for builtin symbol with Python script: {err}");
+                            None
+                        }
+                    }
+                }
                 _ => {
                     let non_stub_path = db
                         .indexer()
