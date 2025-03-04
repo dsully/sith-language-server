@@ -1,19 +1,24 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use lsp_types::{
     request::{self as req},
     CompletionItem, Documentation, MarkupContent, Url,
 };
+use python_ast_utils::nodes::NodeStack;
 use python_parser::parse_module;
-use python_utils::nodes::get_documentation_string_from_node;
+use python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
+use semantic_model::{db::SymbolTableDb, declaration::DeclarationQuery, ScopeId};
 
-use crate::server::api::{
-    requests::completion::CompletionItemData,
-    traits::{BackgroundDocumentRequestHandler, RequestHandler},
-};
 use crate::server::Result;
+use crate::{
+    server::api::{
+        requests::completion::CompletionItemData,
+        traits::{BackgroundDocumentRequestHandler, RequestHandler},
+    },
+    session::DocumentSnapshot,
+};
 
-use super::CompletionItemDataPayload;
+use super::{CompletionItemDataPayload, CompletionItemOrigin};
 
 pub(crate) struct ResolveCompletionItem;
 impl RequestHandler for ResolveCompletionItem {
@@ -45,56 +50,15 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
             None => return Ok(original_completion),
         };
 
-        let db = snapshot.db();
         let completion_item_data: CompletionItemData =
             serde_json::from_value(data).expect("no error when deserializing!");
 
-        let doc_str = match completion_item_data.payload() {
-            Some(CompletionItemDataPayload::Module(completion_item_module_data)) => {
-                // Check if the module was already indexed and get the first string expression
-                // statement. Otherwise, we need to read the file contents and parse it.
-                let ast = if db
-                    .indexer()
-                    .contains_path(completion_item_module_data.path())
-                {
-                    db.indexer().ast(completion_item_module_data.path())
-                } else {
-                    let contents = fs::read_to_string(completion_item_module_data.path())
-                        .expect("file to exist!");
-                    &parse_module(&contents)
-                };
-                ast.suite()
-                    .first()
-                    .and_then(|stmt| stmt.as_expr_stmt())
-                    .and_then(|expr_stmt| expr_stmt.value.as_string_literal_expr())
-                    .map(|str_expr| str_expr.value.to_string())
-            }
-            Some(CompletionItemDataPayload::Symbol(completion_item_symbol_data)) => {
-                let (node_stack, declaration) = if completion_item_symbol_data.is_builtin {
-                    (
-                        db.builtin_symbols().node_stack(),
-                        db.builtin_symbols()
-                            .declaration(completion_item_symbol_data.declaration_id())
-                            .expect("builtin symbol declaration"),
-                    )
-                } else {
-                    let path = db
-                        .indexer()
-                        .file_path(&completion_item_symbol_data.file_id());
-                    (
-                        db.indexer().node_stack(path),
-                        db.declaration(path, completion_item_symbol_data.declaration_id()),
-                    )
-                };
-
-                let completion_item_node = node_stack.nodes().get(declaration.node_id).unwrap();
-
-                get_documentation_string_from_node(completion_item_node)
-            }
-            None => return Ok(original_completion),
-        };
-
-        original_completion.documentation = doc_str.map(|doc| {
+        original_completion.documentation = get_completion_item_documentation(
+            &snapshot,
+            completion_item_data,
+            &original_completion,
+        )
+        .map(|doc| {
             Documentation::MarkupContent(MarkupContent {
                 kind: lsp_types::MarkupKind::Markdown,
                 value: doc,
@@ -103,4 +67,75 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
 
         Ok(original_completion)
     }
+}
+
+fn get_completion_item_documentation(
+    snapshot: &DocumentSnapshot,
+    completion_item_data: CompletionItemData,
+    original_completion: &CompletionItem,
+) -> Option<String> {
+    let db = snapshot.db();
+    match completion_item_data.payload()? {
+        CompletionItemDataPayload::Module(completion_item_module_data) => {
+            get_module_documentation(db, completion_item_module_data.path())
+        }
+        CompletionItemDataPayload::Symbol(completion_item_symbol_data) => {
+            match completion_item_symbol_data.origin() {
+                _ => {
+                    let non_stub_path = db
+                        .indexer()
+                        .non_stub_path(&completion_item_symbol_data.file_id())?;
+                    if db.indexer().is_indexed(non_stub_path) {
+                        let node_stack = db.indexer().node_stack(non_stub_path);
+                        let declaration = db.declaration(
+                            non_stub_path,
+                            completion_item_symbol_data.declaration_id(),
+                        );
+                        let completion_item_node = node_stack.get(declaration.node_id).unwrap();
+
+                        get_documentation_string_from_node(completion_item_node)
+                    } else {
+                        let content = fs::read_to_string(non_stub_path.as_path()).unwrap();
+                        let (table, ast) = db.indexer().symbol_table_builder(
+                            non_stub_path,
+                            completion_item_symbol_data.file_id(),
+                            true,
+                            &content,
+                        );
+                        let declaration = table.symbol_declaration(
+                            &original_completion.label,
+                            ScopeId::global(),
+                            DeclarationQuery::Last,
+                        )?;
+
+                        let node_stack = NodeStack::default()
+                            .is_thirdparty(
+                                completion_item_symbol_data.origin()
+                                    == CompletionItemOrigin::Module,
+                            )
+                            .build(ast.suite());
+                        let completion_item_node = node_stack.get(declaration.node_id).unwrap();
+
+                        get_documentation_string_from_node(completion_item_node)
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn get_module_documentation(db: &SymbolTableDb, path: &PathBuf) -> Option<String> {
+    // Check if the module was already indexed and get the first string expression
+    // statement. Otherwise, we need to read the file contents and parse it.
+    let ast = if db.indexer().is_indexed(path) {
+        db.indexer().ast_or_panic(path)
+    } else {
+        let contents = fs::read_to_string(path).expect("failed to read file!");
+        &parse_module(&contents)
+    };
+    ast.suite()
+        .first()
+        .and_then(|stmt| stmt.as_expr_stmt())
+        .and_then(|expr_stmt| expr_stmt.value.as_string_literal_expr())
+        .map(|str_expr| str_expr.value.to_string())
 }

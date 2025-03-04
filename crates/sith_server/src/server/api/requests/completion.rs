@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use compact_str::CompactString;
 use lsp_types::{
     self as types,
     request::{self as req},
@@ -24,7 +25,7 @@ use semantic_model::{
     declaration::{DeclId, DeclStmt, DeclarationKind, DeclarationQuery},
     mro::compute_mro,
     type_inference::{PythonType, ResolvedType, TypeInferer},
-    Scope, ScopeId, Symbol,
+    Scope, ScopeId, ScopeKind, Symbol,
 };
 use serde::{Deserialize, Serialize};
 
@@ -76,14 +77,42 @@ impl CompletionItemData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+/// Type that represents where the completion item was originated.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+enum CompletionItemOrigin {
+    Class,
+    Module,
+    Function,
+    Lambda,
+    Comprehension,
+    /// Special-case for builtin symbols
+    Builtin,
+}
+
+impl From<ScopeKind> for CompletionItemOrigin {
+    fn from(kind: ScopeKind) -> Self {
+        match kind {
+            ScopeKind::Module => Self::Module,
+            ScopeKind::Class => Self::Class,
+            ScopeKind::Function => Self::Function,
+            ScopeKind::Lambda => Self::Lambda,
+            ScopeKind::Comprehension => Self::Comprehension,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct CompletionItemSymbolData {
     file_id: FileId,
     declaration_id: DeclId,
-    is_builtin: bool,
+    origin: CompletionItemOrigin,
 }
 
 impl CompletionItemSymbolData {
+    fn origin(&self) -> CompletionItemOrigin {
+        self.origin
+    }
+
     fn file_id(&self) -> FileId {
         self.file_id
     }
@@ -93,7 +122,7 @@ impl CompletionItemSymbolData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct CompletionItemModuleData {
     path: PathBuf,
 }
@@ -104,7 +133,7 @@ impl CompletionItemModuleData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum CompletionItemDataPayload {
     Module(CompletionItemModuleData),
     Symbol(CompletionItemSymbolData),
@@ -112,7 +141,7 @@ enum CompletionItemDataPayload {
 
 #[derive(Debug, Eq)]
 struct CompletionItemCandidate {
-    label: String,
+    label: CompactString,
     kind: CompletionItemKind,
     data: Option<CompletionItemDataPayload>,
 }
@@ -132,17 +161,17 @@ impl PartialEq for CompletionItemCandidate {
 
 impl CompletionItemCandidate {
     fn builtin(
-        name: String,
+        name: impl AsRef<str>,
         kind: CompletionItemKind,
         file_id: FileId,
         declaration_id: DeclId,
     ) -> Self {
         Self {
-            label: name,
+            label: CompactString::new(name),
             kind,
             data: Some(CompletionItemDataPayload::Symbol(
                 CompletionItemSymbolData {
-                    is_builtin: true,
+                    origin: CompletionItemOrigin::Builtin,
                     file_id,
                     declaration_id,
                 },
@@ -150,9 +179,9 @@ impl CompletionItemCandidate {
         }
     }
 
-    fn module(module_name: String, module_path: PathBuf) -> Self {
+    fn module(module_name: impl AsRef<str>, module_path: PathBuf) -> Self {
         Self {
-            label: module_name,
+            label: CompactString::new(module_name),
             kind: CompletionItemKind::MODULE,
             data: Some(CompletionItemDataPayload::Module(
                 CompletionItemModuleData { path: module_path },
@@ -160,17 +189,17 @@ impl CompletionItemCandidate {
         }
     }
 
-    fn keyword(keyword: String) -> Self {
+    fn keyword(keyword: impl AsRef<str>) -> Self {
         Self {
-            label: keyword,
+            label: CompactString::new(keyword),
             kind: CompletionItemKind::KEYWORD,
             data: None,
         }
     }
 
-    fn parameter(name: &str) -> Self {
+    fn parameter(name: impl AsRef<str>) -> Self {
         Self {
-            label: format!("{}=", name),
+            label: CompactString::new(format!("{}=", name.as_ref())),
             kind: CompletionItemKind::VARIABLE,
             data: None,
         }
@@ -408,17 +437,25 @@ fn get_completion_candidates_from_scope<'a>(
         .symbols()
         .map(|(symbol_name, symbol_id)| (symbol_name, db.symbol(path, *symbol_id)))
         .filter_map(move |(symbol_name, symbol)| {
-            get_completion_item_kind(db, path, symbol).map(|kind| CompletionItemCandidate {
-                label: symbol_name.to_string(),
-                kind,
-                data: Some(CompletionItemDataPayload::Symbol(
-                    CompletionItemSymbolData {
-                        file_id,
-                        declaration_id: symbol.declarations().last(),
-                        is_builtin: false,
-                    },
-                )),
-            })
+            if symbol.is_module() {
+                let declaration = db.declaration(path, symbol.declarations().last());
+                Some(CompletionItemCandidate::module(
+                    symbol_name,
+                    declaration.import_source()?.non_stub_path()?.to_path_buf(),
+                ))
+            } else {
+                get_completion_item_kind(db, path, symbol).map(|kind| CompletionItemCandidate {
+                    label: symbol_name.clone(),
+                    kind,
+                    data: Some(CompletionItemDataPayload::Symbol(
+                        CompletionItemSymbolData {
+                            file_id,
+                            declaration_id: symbol.declarations().last(),
+                            origin: CompletionItemOrigin::from(scope.kind()),
+                        },
+                    )),
+                })
+            }
         })
 }
 
@@ -480,7 +517,7 @@ fn builtin_completion_candidates(
             } else {
                 get_completion_item_kind(db, db.builtin_symbols().path(), symbol).map(|item_kind| {
                     CompletionItemCandidate::builtin(
-                        symbol_name.to_string(),
+                        symbol_name,
                         item_kind,
                         file_id,
                         declaration_id,
@@ -518,7 +555,7 @@ fn get_completion_candidates(
         completion_candidates.extend(
             BUILTIN_KEYWORDS
                 .iter()
-                .map(|keyword| CompletionItemCandidate::keyword(keyword.to_string())),
+                .map(CompletionItemCandidate::keyword),
         );
     }
 
@@ -624,7 +661,7 @@ fn get_completion_candidates(
                         .into_iter()
                         .map(|completion_item_candidate| CompletionItem {
                             sort_text: Some(completion_item_candidate.sort_text()),
-                            label: completion_item_candidate.label,
+                            label: completion_item_candidate.label.to_string(),
                             kind: Some(completion_item_candidate.kind),
                             data: Some(
                                 serde_json::to_value(CompletionItemData {
@@ -719,7 +756,7 @@ fn get_completion_candidates(
             .into_iter()
             .map(|completion_item_candidate| CompletionItem {
                 sort_text: Some(completion_item_candidate.sort_text()),
-                label: completion_item_candidate.label,
+                label: completion_item_candidate.label.to_string(),
                 kind: Some(completion_item_candidate.kind),
                 data: Some(
                     serde_json::to_value(CompletionItemData {
