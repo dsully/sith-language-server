@@ -96,7 +96,7 @@ impl Deref for SymbolTableDbRef {
 impl Workspace {
     pub(crate) fn new(
         root: &Url,
-        settings: ClientSettings,
+        mut settings: ClientSettings,
         global_settings: &ClientSettings,
     ) -> crate::Result<(PathBuf, Self)> {
         let root_path = find_python_project_root(
@@ -107,12 +107,19 @@ impl Workspace {
 
         let resolved_settings = ResolvedClientSettings::with_workspace(&settings, global_settings);
 
-        let python_host = if let Some(interpreter) = resolved_settings
+        let interpreter = if let Some(interpreter) = resolved_settings
             .interpreter()
             .filter(|interpreter| !interpreter.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| resolve_python_interpreter(&root_path))
         {
+            Some(PathBuf::from(interpreter))
+        } else if let Some(resolved_interpreter) = resolve_python_interpreter(&root_path) {
+            settings.set_interpreter(resolved_interpreter.to_string_lossy().to_string());
+            Some(resolved_interpreter)
+        } else {
+            None
+        };
+
+        let python_host = if let Some(interpreter) = interpreter {
             tracing::info!("Using python interpreter: {}", interpreter.display());
             PythonHost::new(interpreter)
         } else {

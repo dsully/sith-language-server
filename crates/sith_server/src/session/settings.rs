@@ -172,6 +172,10 @@ impl ClientSettings {
                 })
                 .unwrap_or_default()
     }
+
+    pub(crate) fn set_interpreter(&mut self, interpreter: String) {
+        self.interpreter = Some(interpreter);
+    }
 }
 
 impl ResolvedClientSettings {
