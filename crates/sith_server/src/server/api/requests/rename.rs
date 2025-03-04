@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     edit::{position_to_offset, ToRangeExt, WorkspaceEditTracker},
     server::{
@@ -36,7 +38,7 @@ fn rename(
     snapshot: &DocumentSnapshot,
     params: &types::RenameParams,
 ) -> Option<types::WorkspaceEdit> {
-    let current_file_path = snapshot.url().to_file_path().ok()?;
+    let current_file_path = Arc::new(snapshot.url().to_file_path().ok()?);
 
     let db = snapshot.db();
     let document = snapshot.document();
@@ -44,7 +46,7 @@ fn rename(
     let index = document.index();
     let position = params.text_document_position.position;
     let offset = position_to_offset(document.contents(), &position, index);
-    let ast = db.indexer().ast(&current_file_path);
+    let ast = db.indexer().ast_or_panic(&current_file_path);
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;
@@ -80,10 +82,10 @@ fn rename(
         let content = if file_path == &current_file_path {
             document.contents()
         } else {
-            &std::fs::read_to_string(file_path).ok()?
+            &std::fs::read_to_string(file_path.as_path()).ok()?
         };
         let index = LineIndex::from_source_text(content);
-        let url = Url::from_file_path(file_path).ok()?;
+        let url = Url::from_file_path(file_path.as_path()).ok()?;
         let edits = reference
             .into_iter()
             .map(|range| types::TextEdit {

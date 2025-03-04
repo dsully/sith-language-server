@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use lsp_types::{self as types, request as req, HoverContents, MarkupContent, MarkupKind};
 use python_ast_utils::node_at_offset;
 use python_utils::nodes::get_documentation_string_from_node;
@@ -34,7 +36,7 @@ pub(crate) fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
-    let document_path = snapshot.url().to_file_path().ok()?;
+    let document_path = Arc::new(snapshot.url().to_file_path().ok()?);
     let db = snapshot.db();
     let node_stack = db.indexer().node_stack(&document_path);
     let nodes = node_stack.nodes();
@@ -44,7 +46,7 @@ pub(crate) fn hover(
     let offset = position_to_offset(document.contents(), &position, document.index());
 
     let (scope_id, _) = db.find_enclosing_scope(&document_path, offset);
-    let mut type_inferer = TypeInferer::new(db, scope_id, &document_path);
+    let mut type_inferer = TypeInferer::new(db, scope_id, document_path);
 
     let node = node_at_offset(nodes, offset)?;
     let (file_id, node_id) = match type_inferer.infer_node(node, nodes) {

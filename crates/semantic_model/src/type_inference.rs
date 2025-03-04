@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use bitflags::bitflags;
 use indexmap::IndexSet;
@@ -13,7 +13,7 @@ use ruff_text_size::Ranged;
 
 use crate::{
     db::{FileId, SymbolTableDb},
-    declaration::{Declaration, DeclarationKind, DeclarationQuery},
+    declaration::{Declaration, DeclarationKind, DeclarationQuery, ImportSource},
     mro::compute_mro,
     symbol::SymbolId,
     ScopeId,
@@ -161,7 +161,7 @@ impl KnownClass {
 // TODO: add type for class instance and class type
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PythonType {
-    Module(FileId),
+    Module(ImportSource),
     Number(NumberLike),
     String,
     Bytes,
@@ -238,7 +238,7 @@ impl ClassType {
                 arguments: Some(arguments),
                 ..
             }) => {
-                let mut type_inferer = TypeInferer::new(db, ScopeId::global(), path);
+                let mut type_inferer = TypeInferer::new(db, ScopeId::global(), path.clone());
 
                 arguments
                     .args
@@ -344,8 +344,14 @@ impl PythonType {
     #[allow(dead_code)]
     fn display(&self, db: &SymbolTableDb) -> String {
         match self {
-            PythonType::Module(file_id) => {
-                format!("Module[{}]", db.indexer().file_path(file_id).display())
+            PythonType::Module(import_source) => {
+                format!(
+                    "Module[{}]",
+                    import_source
+                        .any_path()
+                        .map(|path| path.display().to_string())
+                        .unwrap_or("Unresolved".into())
+                )
             }
             PythonType::Number(number) => match number {
                 NumberLike::Int => "int".into(),
@@ -505,13 +511,13 @@ bitflags! {
 
 pub struct TypeInferer<'db> {
     db: &'db SymbolTableDb,
-    path: &'db PathBuf,
+    path: Arc<PathBuf>,
     curr_scope: ScopeId,
     flag_stack: Vec<TypeInferFlags>,
 }
 
 impl<'db> TypeInferer<'db> {
-    pub fn new(db: &'db SymbolTableDb, scope_id: ScopeId, path: &'db PathBuf) -> Self {
+    pub fn new(db: &'db SymbolTableDb, scope_id: ScopeId, path: Arc<PathBuf>) -> Self {
         Self {
             db,
             path,
@@ -547,20 +553,23 @@ impl<'db> TypeInferer<'db> {
         self.curr_scope = scope_id;
     }
 
-    fn infer_in_file<F, R>(&mut self, new_path: &'db PathBuf, f: F) -> R
+    fn infer_in_file<F, R>(&mut self, new_path: Arc<PathBuf>, f: F) -> R
     where
-        F: FnOnce(&mut Self) -> R,
+        F: FnOnce(&mut Self, &Nodes) -> R,
     {
         // Store the original context
-        let original_path = self.path;
+        let original_path = self.path.clone();
         let original_scope = self.curr_scope;
+
+        let node_stack = self.db.indexer().node_stack(&new_path);
+        let nodes = node_stack.nodes();
 
         // Change to new context
         self.path = new_path;
         self.curr_scope = ScopeId::global();
 
         // Execute the provided function with the new context
-        let result = f(self);
+        let result = f(self, nodes);
 
         // Restore the original context
         self.path = original_path;
@@ -569,12 +578,12 @@ impl<'db> TypeInferer<'db> {
         result
     }
 
-    fn infer_in_scope<F, R>(&mut self, path: &'db PathBuf, scope_id: ScopeId, func: F) -> R
+    fn infer_in_scope<F, R>(&mut self, path: Arc<PathBuf>, scope_id: ScopeId, func: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
         // Store the original context
-        let original_path = self.path;
+        let original_path = self.path.clone();
         let original_scope = self.curr_scope;
 
         // Change to new context
@@ -666,7 +675,7 @@ impl<'db> TypeInferer<'db> {
                 let special_type_declaration = self
                     .db
                     .symbol_declaration(
-                        self.path,
+                        &self.path,
                         special_type_name,
                         self.curr_scope,
                         DeclarationQuery::AtOffset(range.start().to_u32()),
@@ -675,7 +684,7 @@ impl<'db> TypeInferer<'db> {
                 let special_form_declaration = self
                     .db
                     .symbol_declaration(
-                        self.path,
+                        &self.path,
                         "_SpecialForm",
                         self.curr_scope,
                         DeclarationQuery::Last,
@@ -683,7 +692,7 @@ impl<'db> TypeInferer<'db> {
                     .unwrap();
 
                 ResolvedType::KnownType(PythonType::Class(ClassType {
-                    file_id: self.db.indexer().file_id(self.path),
+                    file_id: self.db.indexer().file_id(&self.path),
                     node_id: special_form_declaration.node_id,
                     symbol_id: special_type_declaration.symbol_id,
                     body_scope: special_form_declaration.body_scope().unwrap(),
@@ -797,16 +806,16 @@ impl<'db> TypeInferer<'db> {
                         let node_stack = self.db.indexer().node_stack(path);
                         let nodes = node_stack.nodes();
 
-                        self.infer_in_scope(path, definition_scope, |this| {
+                        self.infer_in_scope(path.clone(), definition_scope, |this| {
                             this.resolve_declaration_type(declaration, nodes)
                         })
                     }
-                    ResolvedType::KnownType(PythonType::Module(file_id)) => {
-                        let module_path = self.db.indexer().file_path(&file_id);
-                        let node_stack = self.db.indexer().node_stack(module_path);
-                        let nodes = node_stack.nodes();
+                    ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                        let Some(module_path) = import_source.any_path() else {
+                            return ResolvedType::Unknown;
+                        };
 
-                        self.infer_in_file(module_path, |this| {
+                        self.infer_in_file(module_path.clone(), |this, nodes| {
                             this.infer_symbol(attr, nodes, DeclarationQuery::Last)
                         })
                     }
@@ -936,7 +945,7 @@ impl<'db> TypeInferer<'db> {
                     .unwrap_or(ResolvedType::Any)
             }
             AnyNodeRef::Alias(python_ast::Alias { name, .. }) => {
-                let Some(source_path) = declaration.import_source() else {
+                let Some(import_source) = declaration.import_source() else {
                     return ResolvedType::Unknown;
                 };
 
@@ -945,7 +954,7 @@ impl<'db> TypeInferer<'db> {
                     .and_then(|node_id| nodes.get(node_id))
                     .unwrap();
 
-                self.infer_imported_symbol(import_stmt, name, source_path)
+                self.infer_imported_symbol(import_stmt, name, import_source)
                     .unwrap_or(ResolvedType::Unknown)
             }
             AnyNodeRef::Parameter(python_ast::Parameter { annotation, .. }) => {
@@ -958,10 +967,10 @@ impl<'db> TypeInferer<'db> {
                 //   class MyClass:
                 //       def method(self): ... # <- `self` has type `MyClass`
                 if let DeclarationKind::InstanceParameter(class_symbol_id) = declaration.kind {
-                    let class_symbol = self.db.symbol(self.path, class_symbol_id);
+                    let class_symbol = self.db.symbol(&self.path, class_symbol_id);
                     let declaration = self
                         .db
-                        .declaration(self.path, class_symbol.declarations().last());
+                        .declaration(&self.path, class_symbol.declarations().last());
                     return self.resolve_declaration_type(declaration, nodes);
                 }
 
@@ -1015,22 +1024,21 @@ impl<'db> TypeInferer<'db> {
         &mut self,
         node: &AnyNodeRef,
         name: &str,
-        source_path: &'db PathBuf,
+        import_source: &'db ImportSource,
     ) -> Option<ResolvedType> {
+        if import_source.is_unresolved() {
+            return None;
+        }
         Some(match node {
             AnyNodeRef::StmtImport(_) => {
-                let file_id = self.db.indexer().file_id(source_path);
-                ResolvedType::KnownType(PythonType::Module(file_id))
+                ResolvedType::KnownType(PythonType::Module(import_source.clone()))
             }
             AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt { .. }) => {
-                if is_python_module(name, source_path) {
-                    let file_id = self.db.indexer().file_id(source_path);
-                    ResolvedType::KnownType(PythonType::Module(file_id))
+                let path = import_source.any_path().unwrap();
+                if is_python_module(name, path) {
+                    ResolvedType::KnownType(PythonType::Module(import_source.clone()))
                 } else {
-                    let node_stack = self.db.indexer().node_stack(source_path);
-                    let nodes = node_stack.nodes();
-
-                    self.infer_in_file(source_path, |this| {
+                    self.infer_in_file(path.clone(), |this, nodes| {
                         this.infer_symbol(name, nodes, DeclarationQuery::Last)
                     })
                 }
@@ -1045,24 +1053,22 @@ impl<'db> TypeInferer<'db> {
         nodes: &Nodes,
         query: DeclarationQuery,
     ) -> ResolvedType {
-        let Some(declaration) = self
-            .db
-            .symbol_declaration(self.path, name, self.curr_scope, query)
+        let Some(declaration) =
+            self.db
+                .symbol_declaration(&self.path, name, self.curr_scope, query)
         else {
             return ResolvedType::Unknown;
         };
 
         if self
             .db
-            .symbol(self.path, declaration.symbol_id)
+            .symbol(&self.path, declaration.symbol_id)
             .is_builtin()
         {
-            let node_stack = NodeStack::default().build(self.db.builtin_symbols().suite());
-            let builtin_nodes = node_stack.nodes();
-
-            return self.infer_in_file(self.db.builtin_symbols().path(), |this| {
-                this.resolve_declaration_type(declaration, builtin_nodes)
-            });
+            return self.infer_in_file(
+                self.db.builtin_symbols().path().clone(),
+                |this, builtin_nodes| this.resolve_declaration_type(declaration, builtin_nodes),
+            );
         }
 
         self.resolve_declaration_type(declaration, nodes)
@@ -1308,7 +1314,10 @@ fn is_collection_typing(expr: &Expr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::{
+        path::{Path, PathBuf},
+        sync::Arc,
+    };
 
     use python_ast::{AnyNodeRef, Expr};
     use python_utils::{interpreter::resolve_python_interpreter, PythonHost};
@@ -1349,7 +1358,7 @@ mod tests {
     }
 
     fn assert_type(src: &str, path: impl AsRef<Path>, expected: &str) {
-        let path = resolve_relative_path(path);
+        let path = Arc::new(resolve_relative_path(path));
         let parent = path.parent().unwrap();
         let curr_dir = std::env::current_dir().expect("Failed to get current dir");
         let root = if parent.to_string_lossy() == "" {
@@ -1376,7 +1385,7 @@ mod tests {
             .expect("expression to type infer");
 
         let (scope_id, _) = db.find_enclosing_scope(&path, expr_to_infer.range().start().to_u32());
-        let mut type_inferer = TypeInferer::new(&db, scope_id, &path);
+        let mut type_inferer = TypeInferer::new(&db, scope_id, path);
         let resolved_type = type_inferer.infer_expr(expr_to_infer, stack.nodes());
 
         assert_eq!(resolved_type.display(&db), expected)

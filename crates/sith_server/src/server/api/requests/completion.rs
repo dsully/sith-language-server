@@ -1,6 +1,7 @@
 use std::{
     hash::Hash,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use lsp_types::{
@@ -182,7 +183,7 @@ impl CompletionItemCandidate {
 
 fn position_context<'nodes>(
     db: &SymbolTableDb,
-    path: &PathBuf,
+    path: &Arc<PathBuf>,
     scope_id: ScopeId,
     nodes: &'nodes Nodes,
     offset: u32,
@@ -339,11 +340,11 @@ fn is_in_type_param_annotation(offset: u32, param: &python_ast::Parameter) -> bo
 fn get_call_expr_position_ctx<'nodes>(
     func: &Expr,
     db: &SymbolTableDb,
-    path: &PathBuf,
+    path: &Arc<PathBuf>,
     scope_id: ScopeId,
     nodes: &'nodes Nodes,
 ) -> PositionCtx<'nodes> {
-    let mut type_inferer = TypeInferer::new(db, scope_id, path);
+    let mut type_inferer = TypeInferer::new(db, scope_id, path.clone());
     match type_inferer.infer_expr(func, nodes) {
         ResolvedType::KnownType(PythonType::Class(class)) => {
             let Some(declaration) = class.constructor(db) else {
@@ -492,7 +493,7 @@ fn builtin_completion_candidates(
 fn get_completion_candidates(
     db: &SymbolTableDb,
     pos_ctx: PositionCtx,
-    path: &PathBuf,
+    path: &Arc<PathBuf>,
     nodes: &Nodes,
     scope: ScopeId,
 ) -> Option<Vec<CompletionItem>> {
@@ -554,7 +555,7 @@ fn get_completion_candidates(
                 let last_segment = prev_segments.last().unwrap();
                 let declaration =
                     db.symbol_declaration(path, last_segment, scope, DeclarationQuery::Last)?;
-                let parent = declaration.import_source()?.parent()?;
+                let parent = declaration.import_source()?.any_path()?.parent()?;
                 completion_candidates = get_python_module_candidates(parent);
             } else {
                 completion_candidates = get_thirdparty_and_builtin_modules_candidates(db);
@@ -589,7 +590,7 @@ fn get_completion_candidates(
                 let segment = prev_segments.last()?;
                 let declaration =
                     db.symbol_declaration(path, segment, scope, DeclarationQuery::Last)?;
-                let source_path = declaration.import_source()?;
+                let source_path = declaration.import_source()?.any_path()?;
 
                 if source_path.ends_with("__init__.py") || source_path.ends_with("__init__.pyi") {
                     completion_candidates = get_python_module_candidates(source_path.parent()?);
@@ -643,7 +644,7 @@ fn get_completion_candidates(
             let last_seg = last_segment.unwrap();
             let declaration =
                 db.symbol_declaration(path, last_seg, scope, DeclarationQuery::Last)?;
-            let source = declaration.import_source()?;
+            let source = declaration.import_source()?.any_path()?;
             completion_candidates =
                 get_completion_candidates_from_scope(db, source, db.global_scope(source)).collect();
 
@@ -677,7 +678,7 @@ fn get_completion_candidates(
             ));
         }
         PositionCtx::AttrAccess(expr, scope_id) => {
-            let mut type_inferer = TypeInferer::new(db, *scope_id, path);
+            let mut type_inferer = TypeInferer::new(db, *scope_id, path.clone());
             match type_inferer.infer_expr(*expr, nodes) {
                 ResolvedType::KnownType(PythonType::Class(class)) => match compute_mro(db, class) {
                     Ok(class_bases) => {
@@ -700,8 +701,8 @@ fn get_completion_candidates(
                         );
                     }
                 },
-                ResolvedType::KnownType(PythonType::Module(file_id)) => {
-                    let module_path = db.indexer().file_path(&file_id);
+                ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                    let module_path = import_source.any_path()?;
                     let scope = db.scope(module_path, ScopeId::global());
 
                     completion_candidates =
@@ -749,11 +750,13 @@ impl super::BackgroundDocumentRequestHandler for Completion {
         _: Notifier,
         params: types::CompletionParams,
     ) -> Result<Option<types::CompletionResponse>> {
-        let path = snapshot
-            .url()
-            .to_file_path()
-            .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let path = Arc::new(
+            snapshot
+                .url()
+                .to_file_path()
+                .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?,
+        );
 
         let db = snapshot.db();
         let document = snapshot.document();

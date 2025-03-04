@@ -3,6 +3,7 @@ use std::{
     hash::BuildHasherDefault,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use bimap::BiHashMap;
@@ -15,12 +16,12 @@ use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
     config::Config, execution_environment::ExecutionEnvironment, host::Host,
 };
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::{
-    declaration::{DeclId, Declaration, DeclarationQuery},
+    declaration::{DeclId, Declaration, DeclarationQuery, ImportSource},
     symbol::{Symbol, SymbolId},
     symbol_table::{ImportResolverConfig, SymbolTable, SymbolTableBuilder},
     vendored::setup_typeshed,
@@ -39,30 +40,73 @@ type FxBiHashMap<L, R> =
 #[derive(Serialize, Deserialize)]
 pub struct FileId;
 
+impl Default for FileId {
+    fn default() -> Self {
+        FileId::new(0)
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Files {
-    paths: FxBiHashMap<PathBuf, FileId>,
+    stub_paths: FxBiHashMap<Arc<PathBuf>, FileId>,
+    non_stub_paths: FxBiHashMap<Arc<PathBuf>, FileId>,
+    indexed: FxHashSet<Arc<PathBuf>>,
+    next_id: FileId,
 }
 
 impl Files {
-    fn contains_path(&self, path: &PathBuf) -> bool {
-        self.paths.contains_left(path)
+    fn contains_file(&self, path: &PathBuf) -> bool {
+        self.stub_paths.contains_left(path) || self.non_stub_paths.contains_left(path)
     }
 
-    fn insert(&mut self, path: PathBuf) -> FileId {
-        let next_index = FileId::new(self.paths.len() + 1);
-        self.paths
-            .insert_no_overwrite(path, next_index)
+    fn push_file(&mut self, path: Arc<PathBuf>) -> FileId {
+        if path.extension().is_some_and(|ext| ext == "pyi") {
+            self.push_stub_file(path)
+        } else {
+            self.push_non_stub_file(path)
+        }
+    }
+
+    fn push_stub_file(&mut self, path: Arc<PathBuf>) -> FileId {
+        self.next_id = FileId::new(self.next_id.as_usize() + 1);
+        self.stub_paths
+            .insert_no_overwrite(path, self.next_id)
             .expect("Tried to insert repeated value");
-        next_index
+        self.next_id
     }
 
-    fn get_by_id(&self, file_id: &FileId) -> Option<&PathBuf> {
-        self.paths.get_by_right(file_id)
+    fn push_non_stub_file(&mut self, path: Arc<PathBuf>) -> FileId {
+        self.next_id = FileId::new(self.next_id.as_usize() + 1);
+        self.non_stub_paths
+            .insert_no_overwrite(path.clone(), self.next_id)
+            .expect("Tried to insert repeated value");
+        self.next_id
     }
 
-    fn get_by_path(&self, path: &PathBuf) -> Option<&FileId> {
-        self.paths.get_by_left(path)
+    fn any_path(&self, file_id: &FileId) -> Option<&Arc<PathBuf>> {
+        self.stub_path(file_id).or(self.non_stub_path(file_id))
+    }
+
+    fn any_file_id(&self, path: &PathBuf) -> Option<FileId> {
+        self.stub_file_id(path)
+            .or(self.non_stub_file_id(path))
+            .copied()
+    }
+
+    fn stub_path(&self, file_id: &FileId) -> Option<&Arc<PathBuf>> {
+        self.stub_paths.get_by_right(file_id)
+    }
+
+    fn stub_file_id(&self, path: &PathBuf) -> Option<&FileId> {
+        self.stub_paths.get_by_left(path)
+    }
+
+    fn non_stub_path(&self, file_id: &FileId) -> Option<&Arc<PathBuf>> {
+        self.non_stub_paths.get_by_right(file_id)
+    }
+
+    fn non_stub_file_id(&self, path: &PathBuf) -> Option<&FileId> {
+        self.non_stub_paths.get_by_left(path)
     }
 }
 
@@ -70,11 +114,11 @@ impl Files {
 pub struct BuiltinSymbolTable {
     table: SymbolTable,
     ast: Parsed<ModModule>,
-    path: PathBuf,
+    path: Arc<PathBuf>,
 }
 
 impl BuiltinSymbolTable {
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Arc<PathBuf> {
         &self.path
     }
 
@@ -126,7 +170,7 @@ impl Default for BuiltinSymbolTable {
         Self {
             table: SymbolTable::default(),
             ast: Parsed::default(),
-            path: PathBuf::new(),
+            path: Arc::new(PathBuf::new()),
         }
     }
 }
@@ -143,7 +187,9 @@ pub struct Indexer {
     host: PythonHost,
 
     was_root_path_indexed: bool,
-    collection_stub_path: PathBuf,
+
+    collection_stub_path: Arc<PathBuf>,
+    builtins_stub_path: Arc<PathBuf>,
 }
 
 impl Indexer {
@@ -154,7 +200,8 @@ impl Indexer {
             asts: FxHashMap::default(),
             files: Files::default(),
             builtin_symbol_table: BuiltinSymbolTable::default(),
-            collection_stub_path: typeshed_path.join("stdlib/collections/__init__.pyi"),
+            collection_stub_path: Arc::new(typeshed_path.join("stdlib/collections/__init__.pyi")),
+            builtins_stub_path: Arc::new(typeshed_path.join("stdlib/builtins.pyi")),
             exec_env: ExecutionEnvironment {
                 root,
                 python_version: python_host.version,
@@ -220,41 +267,64 @@ impl Indexer {
     fn index_content(
         &self,
         file_id: FileId,
+        is_thirdparty: bool,
         content: &str,
-    ) -> (SymbolTable, Parsed<ModModule>, Vec<PathBuf>) {
+    ) -> (SymbolTable, Parsed<ModModule>, Vec<ImportSource>) {
         let path = self.file_path(&file_id);
-        let parsed_file = parse_module(content);
-        let table = SymbolTableBuilder::new(
-            path,
-            file_id,
-            ImportResolverConfig::new(&self.exec_env, &self.config, &self.host),
-        )
-        .build(parsed_file.suite());
+        let (table, parsed_file) = self.symbol_table_builder(path, file_id, is_thirdparty, content);
 
-        let mut import_paths = Vec::new();
+        let mut deferred_paths = Vec::new();
         for import_source in table
             .declarations()
             .filter_map(|declaration| declaration.import_source())
+            .filter(|import_source| !import_source.is_unresolved())
         {
-            import_paths.push(import_source.clone());
+            deferred_paths.push(import_source.clone());
         }
 
-        (table, parsed_file, import_paths)
+        (table, parsed_file, deferred_paths)
     }
 
-    fn index_files(&mut self, mut file_ids: Vec<FileId>) {
+    pub fn symbol_table_builder(
+        &self,
+        path: &Path,
+        file_id: FileId,
+        is_thirdparty: bool,
+        content: &str,
+    ) -> (SymbolTable, Parsed<ModModule>) {
+        let parsed_file = parse_module(content);
+        (
+            SymbolTableBuilder::new(
+                path,
+                file_id,
+                is_thirdparty,
+                ImportResolverConfig::new(&self.exec_env, &self.config, &self.host),
+            )
+            .build(parsed_file.suite()),
+            parsed_file,
+        )
+    }
+
+    fn index_files(&mut self, mut file_ids: Vec<(FileId, bool)>) {
         loop {
+            self.files.indexed.extend(
+                file_ids
+                    .iter()
+                    .map(|(file_id, _)| self.file_path(file_id).clone())
+                    .collect::<Vec<_>>(),
+            );
+
             let tables: Vec<_> = file_ids
                 .into_par_iter()
-                .filter_map(|file_id| {
+                .filter_map(|(file_id, is_thirdparty)| {
                     let path = self.file_path(&file_id);
                     if path.is_file() && path.extension().is_some_and(|ext| ext != "so") {
-                        let content = fs::read_to_string(path)
+                        let content = fs::read_to_string(path.as_path())
                             .unwrap_or_else(|e| panic!("{e}: {}", path.display()));
-                        let (table, parsed_file, import_paths) =
-                            self.index_content(file_id, &content);
+                        let (table, parsed_file, deferred_paths) =
+                            self.index_content(file_id, is_thirdparty, &content);
 
-                        Some((file_id, table, parsed_file, import_paths))
+                        Some((file_id, table, parsed_file, deferred_paths))
                     } else {
                         None
                     }
@@ -263,9 +333,9 @@ impl Indexer {
 
             // files that will be parsed later
             let mut deferred_file_ids = Vec::new();
-            for (file_id, table, parsed_file, import_paths) in tables {
+            for (file_id, table, parsed_file, deferred_paths) in tables {
                 // collect the resolved import paths to be parsed later
-                deferred_file_ids.extend(self.push_file_ids(import_paths));
+                deferred_file_ids.extend(self.push_file_ids(deferred_paths));
 
                 self.tables.insert(file_id, table);
                 self.asts.insert(file_id, parsed_file);
@@ -280,25 +350,27 @@ impl Indexer {
     }
 
     fn index_builtin_symbols(&mut self) {
-        let builtins_path = self.typeshed_path().join("stdlib/builtins.pyi");
-        let content = fs::read_to_string(&builtins_path).expect("builtins.pyi file not found");
+        let content = fs::read_to_string(self.builtins_stub_path.as_path())
+            .expect("builtins.pyi file not found");
 
-        let file_id = self.push_file(builtins_path.clone());
-        let (table, parsed_file, _) = self.index_content(file_id, &content);
+        self.files.indexed.insert(self.builtins_stub_path.clone());
+        let file_id = self.push_file(self.builtins_stub_path.clone());
+        let (table, parsed_file, _) = self.index_content(file_id, true, &content);
 
         self.builtin_symbol_table = BuiltinSymbolTable {
             table,
             ast: parsed_file,
-            path: builtins_path,
+            path: self.builtins_stub_path.clone(),
         };
     }
 
     fn index_collection_types(&mut self) {
-        let content = fs::read_to_string(&self.collection_stub_path)
+        let content = fs::read_to_string(self.collection_stub_path.as_path())
             .expect("collections/__init__.pyi file not found");
 
+        self.files.indexed.insert(self.collection_stub_path.clone());
         let file_id = self.push_file(self.collection_stub_path.clone());
-        let (table, parsed_file, _) = self.index_content(file_id, &content);
+        let (table, parsed_file, _) = self.index_content(file_id, true, &content);
         self.tables.insert(file_id, table);
         self.asts.insert(file_id, parsed_file);
     }
@@ -307,16 +379,16 @@ impl Indexer {
         self.tables.iter()
     }
 
-    fn push_file(&mut self, file_path: PathBuf) -> FileId {
-        self.files.insert(file_path)
+    fn push_file(&mut self, file_path: Arc<PathBuf>) -> FileId {
+        self.files.push_file(file_path)
     }
 
     pub fn typeshed_path(&self) -> &PathBuf {
         self.config.typeshed_path.as_ref().unwrap()
     }
 
-    pub fn contains_path(&self, path: &PathBuf) -> bool {
-        self.files.contains_path(path)
+    fn was_seen(&self, path: &PathBuf) -> bool {
+        self.files.contains_file(path)
     }
 
     pub fn root_path(&self) -> &Path {
@@ -330,10 +402,14 @@ impl Indexer {
     /// Returns the path [`PathBuf`] for a given `file_id`.
     /// # Panics
     /// If there's no [`PathBuf`] for a `file_id`.
-    pub fn file_path(&self, file_id: &FileId) -> &PathBuf {
+    pub fn file_path(&self, file_id: &FileId) -> &Arc<PathBuf> {
         self.files
-            .get_by_id(file_id)
-            .unwrap_or_else(|| panic!("no `file_path` for {:?}", file_id))
+            .any_path(file_id)
+            .unwrap_or_else(|| panic!("no file path for {:?}", file_id))
+    }
+
+    pub fn non_stub_path(&self, file_id: &FileId) -> Option<&Arc<PathBuf>> {
+        self.files.non_stub_path(file_id)
     }
 
     /// Returns the [`FileId`] for a given `file_path`.
@@ -341,37 +417,99 @@ impl Indexer {
     /// If there's no [`FileId`] for a `file_path`.
     pub fn file_id(&self, file_path: &PathBuf) -> FileId {
         self.files
-            .get_by_path(file_path)
-            .copied()
+            .any_file_id(file_path)
             .unwrap_or_else(|| panic!("no `file_id` for {}", file_path.display()))
     }
 
-    pub fn ast(&self, file: &PathBuf) -> &Parsed<ModModule> {
-        match self
-            .files
-            .get_by_path(file)
-            .and_then(|file_id| self.asts.get(file_id))
-        {
-            Some(ast) => ast,
-            None if file.ends_with("stdlib/builtins.pyi") => &self.builtin_symbol_table.ast,
-            _ => panic!("no ast for path: {}", file.display()),
-        }
+    /// Returns the AST for the `file_path`, if `file_path` was not indexed
+    /// returns `None`.
+    pub fn ast(&self, file_path: &PathBuf) -> Option<&Parsed<ModModule>> {
+        Some(
+            match self
+                .files
+                .any_file_id(file_path)
+                .and_then(|file_id| self.asts.get(&file_id))
+            {
+                Some(ast) => ast,
+                None if file_path.ends_with("stdlib/builtins.pyi") => {
+                    &self.builtin_symbol_table.ast
+                }
+                _ => return None,
+            },
+        )
+    }
+
+    /// Returns the AST for the `file_path`.
+    ///
+    /// # Panics
+    /// If `file_path` was not indexed.
+    pub fn ast_or_panic(&self, file_path: &PathBuf) -> &Parsed<ModModule> {
+        self.ast(file_path)
+            .unwrap_or_else(|| panic!("no ast for path: {}", file_path.display()))
     }
 
     pub fn node_stack(&self, file: &PathBuf) -> NodeStack {
-        let suite = self.ast(file).suite();
+        let suite = self.ast_or_panic(file).suite();
         NodeStack::default().build(suite)
     }
 
-    fn push_file_ids(&mut self, paths: Vec<PathBuf>) -> Vec<FileId> {
+    pub fn is_indexed(&self, path: &PathBuf) -> bool {
+        self.files.indexed.contains(path)
+    }
+
+    /// Registers a list of [`ImportSource`] in the indexer, creating the corresponding [`FileId`]
+    /// for the stub or non-stub path. If [`ImportSource`] has both stub and non-stub path, the
+    /// [`FileId`] created will be associated for both of them.
+    ///
+    /// Returns a list of `(FileId, bool)`, where:
+    /// - `FileId` is the unique id for the registered path
+    /// - `bool` indicates whether the path is third-party (from the stdlib or site-packages)
+    fn push_file_ids(&mut self, paths: Vec<ImportSource>) -> Vec<(FileId, bool)> {
         paths
             .into_iter()
-            .filter_map(|path| {
-                if self.contains_path(&path) {
-                    None
-                } else {
-                    Some(self.push_file(path))
+            .filter_map(|import_source| {
+                // Skip if both paths are None
+                if import_source.stub.is_none() && import_source.non_stub.is_none() {
+                    return None;
                 }
+
+                // Case 1: We have a stub path (.pyi file)
+                if let Some(stub_path) = import_source.stub {
+                    // Skip if already indexed
+                    if self.was_seen(&stub_path) {
+                        return None;
+                    }
+
+                    // Register the stub path
+                    let file_id = self.files.push_stub_file(stub_path);
+
+                    // If we also have a non-stub path, associate it with the same file ID
+                    if let Some(non_stub_path) = import_source.non_stub {
+                        // Associate the non-stub path with the same file ID if not already indexed
+                        if !self.was_seen(&non_stub_path) {
+                            self.files
+                                .non_stub_paths
+                                .insert_no_overwrite(non_stub_path, file_id)
+                                .expect("Tried to insert duplicated value");
+                        }
+                    }
+
+                    return Some((file_id, import_source.is_thirdparty));
+                }
+
+                // Case 2: We only have a non-stub path (.py file)
+                if let Some(non_stub_path) = import_source.non_stub {
+                    // Skip if already indexed
+                    if self.was_seen(&non_stub_path) {
+                        return None;
+                    }
+
+                    // Register the non-stub path
+                    let file_id = self.files.push_non_stub_file(non_stub_path);
+                    return Some((file_id, import_source.is_thirdparty));
+                }
+
+                unreachable!()
             })
             .collect()
     }
@@ -379,12 +517,15 @@ impl Indexer {
     pub fn add_or_update_file(&mut self, file_path: PathBuf, source: Source) {
         let deferred_paths = match source {
             Source::New(source) => {
-                if self.contains_path(&file_path) {
+                if self.was_seen(&file_path) {
                     return;
                 }
 
-                let file_id = self.push_file(file_path);
-                let (table, parsed_file, mut import_paths) = self.index_content(file_id, source);
+                let path = Arc::new(file_path);
+                self.files.indexed.insert(path.clone());
+                let file_id = self.push_file(path);
+                let (table, parsed_file, mut deferred_paths) =
+                    self.index_content(file_id, false, source);
 
                 self.tables.insert(file_id, table);
                 self.asts.insert(file_id, parsed_file);
@@ -393,19 +534,23 @@ impl Indexer {
                     self.was_root_path_indexed = true;
 
                     let python_files = Indexer::scan_dir_for_python_files(&self.exec_env.root);
-                    import_paths.extend(python_files);
+                    deferred_paths.extend(python_files.into_iter().map(|path| ImportSource {
+                        stub: None,
+                        non_stub: Some(Arc::new(path)),
+                        is_thirdparty: true,
+                    }));
                 }
 
-                import_paths
+                deferred_paths
             }
             Source::Update { new, .. } => {
                 let file_id = self.file_id(&file_path);
-                let (table, parsed_file, import_paths) = self.index_content(file_id, new);
+                let (table, parsed_file, deferred_paths) = self.index_content(file_id, false, new);
 
                 self.tables.insert(file_id, table);
                 self.asts.insert(file_id, parsed_file);
 
-                import_paths
+                deferred_paths
             }
         };
 

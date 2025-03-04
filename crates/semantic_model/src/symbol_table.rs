@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use bitflags::bitflags;
 use python_ast::{
@@ -10,9 +10,10 @@ use python_ast_utils::{
     create_import_module_descriptor,
     nodes::{NodeId, Nodes},
 };
-use python_utils::PythonHost;
+use python_utils::{is_python_module, PythonHost};
 use ruff_python_resolver::{
-    config::Config, execution_environment::ExecutionEnvironment, resolver::resolve_import,
+    config::Config, execution_environment::ExecutionEnvironment, import_result::ImportType,
+    resolver::resolve_import,
 };
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -21,7 +22,7 @@ use crate::{
     db::FileId,
     declaration::{
         DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery, Declarations,
-        SymbolDeclarations,
+        ImportSource, SymbolDeclarations,
     },
     symbol::{Symbol, SymbolFlags, SymbolId, Symbols},
     Scope, ScopeId, ScopeKind, Scopes,
@@ -114,6 +115,7 @@ impl Default for SymbolTable {
 
 struct FileInfo<'a> {
     path: &'a Path,
+    is_thirdparty: bool,
     is_builtin_stub_file: bool,
 }
 
@@ -171,11 +173,13 @@ impl<'a> SymbolTableBuilder<'a> {
     pub fn new(
         filepath: &'a Path,
         file_id: FileId,
+        is_thirdparty: bool,
         import_resolver_cfg: ImportResolverConfig<'a>,
     ) -> Self {
         Self {
             file_info: FileInfo {
                 path: filepath,
+                is_thirdparty,
                 is_builtin_stub_file: filepath.ends_with("stdlib/builtins.pyi"),
             },
             file_id,
@@ -387,7 +391,14 @@ where
 
                 self.curr_scope = self.push_scope(ScopeKind::Function, *range);
                 self.visit_parameters(parameters);
-                self.visit_body(body);
+
+                // If the current file is from the python stdlib or "site-packages"
+                // we should only visit the first statement of the function body.
+                if self.file_info.is_thirdparty && !body.is_empty() {
+                    self.visit_body(&body[..1]);
+                } else {
+                    self.visit_body(body);
+                }
 
                 let declaration = self.table.decls.get_mut(decl_id).unwrap();
                 declaration.kind = if self.flags.contains(VisitorFlags::IN_CLASS) {
@@ -440,6 +451,10 @@ where
                     self.import_resolver_cfg.config,
                     self.import_resolver_cfg.host,
                 );
+                let is_thirdparty = matches!(
+                    import_result.import_type,
+                    ImportType::ThirdParty | ImportType::BuiltIn
+                );
 
                 if let Some(module) = &import_from.module {
                     let mut pos = 0;
@@ -468,9 +483,12 @@ where
                                         .and_then(|non_stub_import_result| {
                                             non_stub_import_result.resolved_paths.get(i)
                                         });
-                                    (resolved_path, non_stub_resolved_path.cloned())
+                                    (
+                                        resolved_path.map(Arc::new),
+                                        non_stub_resolved_path.cloned().map(Arc::new),
+                                    )
                                 } else {
-                                    (None, resolved_path)
+                                    (None, resolved_path.map(Arc::new))
                                 }
                             } else {
                                 (None, None)
@@ -482,10 +500,11 @@ where
 
                         self.push_declaration(
                             segment,
-                            DeclarationKind::Stmt(DeclStmt::ImportSegment {
-                                stub_source: stub_resolved_path,
-                                non_stub_source: non_stub_resolved_path,
-                            }),
+                            DeclarationKind::Stmt(DeclStmt::ImportSegment(ImportSource {
+                                stub: stub_resolved_path,
+                                non_stub: non_stub_resolved_path,
+                                is_thirdparty,
+                            })),
                             segment_range,
                             node_id,
                         );
@@ -511,9 +530,9 @@ where
                                 })
                         {
                             if implicit_import.is_stub_file {
-                                (Some(implicit_import.path.clone()), None)
+                                (Some(Arc::new(implicit_import.path.clone())), None)
                             } else {
-                                (None, Some(implicit_import.path.clone()))
+                                (None, Some(Arc::new(implicit_import.path.clone())))
                             }
                         } else {
                             // If the `path` is empty, we have a namespace package. If the import name
@@ -532,24 +551,26 @@ where
                                         non_stub_import_result.resolved_paths.last().cloned()
                                     });
                                 (
-                                    import_result.resolved_paths.last().cloned(),
-                                    non_stub_resolved_path,
+                                    import_result.resolved_paths.last().cloned().map(Arc::new),
+                                    non_stub_resolved_path.map(Arc::new),
                                 )
                             } else {
-                                (None, import_result.resolved_paths.last().cloned())
+                                (
+                                    None,
+                                    import_result.resolved_paths.last().cloned().map(Arc::new),
+                                )
                             }
                         };
+                    let import_src = ImportSource {
+                        stub: stub_resolved_path,
+                        non_stub: non_stub_resolved_path,
+                        is_thirdparty,
+                    };
 
                     let declaration_kind = if name.name.as_str() == "*" {
-                        DeclarationKind::Stmt(DeclStmt::ImportStar {
-                            stub_source: stub_resolved_path,
-                            non_stub_source: non_stub_resolved_path,
-                        })
+                        DeclarationKind::Stmt(DeclStmt::ImportStar(import_src))
                     } else {
-                        DeclarationKind::Stmt(DeclStmt::Import {
-                            stub_source: stub_resolved_path,
-                            non_stub_source: non_stub_resolved_path,
-                        })
+                        DeclarationKind::Stmt(DeclStmt::Import(import_src))
                     };
                     let (decl_id, _) = self.push_declaration(
                         &name.name,
@@ -581,6 +602,10 @@ where
                         self.import_resolver_cfg.config,
                         self.import_resolver_cfg.host,
                     );
+                    let is_thirdparty = matches!(
+                        import_result.import_type,
+                        ImportType::ThirdParty | ImportType::BuiltIn
+                    );
 
                     let mut pos = 0;
                     for (i, segment) in name
@@ -611,13 +636,21 @@ where
                                         .and_then(|non_stub_import_result| {
                                             non_stub_import_result.resolved_paths.get(i)
                                         });
-                                    (resolved_path, non_stub_resolved_path.cloned())
+                                    (
+                                        resolved_path.map(Arc::new),
+                                        non_stub_resolved_path.cloned().map(Arc::new),
+                                    )
                                 } else {
-                                    (None, resolved_path)
+                                    (None, resolved_path.map(Arc::new))
                                 }
                             } else {
                                 (None, None)
                             };
+                        let import_src = ImportSource {
+                            stub: stub_resolved_path,
+                            non_stub: non_stub_resolved_path,
+                            is_thirdparty,
+                        };
 
                         let start = name.range().start().to_u32() + pos;
                         let end = start + segment.len() as u32;
@@ -626,15 +659,9 @@ where
                         let (decl_id, _) = self.push_declaration(
                             segment,
                             if is_first_segment {
-                                DeclarationKind::Stmt(DeclStmt::Import {
-                                    stub_source: stub_resolved_path,
-                                    non_stub_source: non_stub_resolved_path,
-                                })
+                                DeclarationKind::Stmt(DeclStmt::Import(import_src))
                             } else {
-                                DeclarationKind::Stmt(DeclStmt::ImportSegment {
-                                    stub_source: stub_resolved_path,
-                                    non_stub_source: non_stub_resolved_path,
-                                })
+                                DeclarationKind::Stmt(DeclStmt::ImportSegment(import_src))
                             },
                             segment_range,
                             self.curr_node.unwrap(),

@@ -87,7 +87,7 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
     let document_path = snapshot.url().to_file_path().expect("to be a filepath");
     let db = snapshot.db();
     let document = snapshot.document();
-    let ast = db.indexer().ast(&document_path);
+    let ast = db.indexer().ast_or_panic(&document_path);
 
     let mut diagnostics = Vec::new();
     let create_diagnostic = |message, range, severity, source| Diagnostic {
@@ -119,15 +119,8 @@ pub(super) fn generate_sith_diagnostics(snapshot: &DocumentSnapshot) -> Vec<Diag
             .declarations()
             .filter(|declaration| match &declaration.kind {
                 DeclarationKind::Stmt(
-                    DeclStmt::Import {
-                        stub_source: None,
-                        non_stub_source: None,
-                    }
-                    | DeclStmt::ImportSegment {
-                        stub_source: None,
-                        non_stub_source: None,
-                    },
-                ) => true,
+                    DeclStmt::Import(import_source) | DeclStmt::ImportSegment(import_source),
+                ) if import_source.is_unresolved() => true,
                 DeclarationKind::Stmt(DeclStmt::SameImport(decl_id)) => db
                     .declaration(&document_path, *decl_id)
                     .import_source()

@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lsp_types::{self as types, request as req, Url};
 use python_ast::{AnyNodeRef, Arguments};
@@ -8,7 +9,7 @@ use python_ast_utils::{identifier_from_node, node_at_offset};
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use semantic_model::db::SymbolTableDb;
-use semantic_model::declaration::{Declaration, DeclarationQuery};
+use semantic_model::declaration::{Declaration, DeclarationQuery, ImportSource};
 use semantic_model::type_inference::TypeInferer;
 use semantic_model::type_inference::{PythonType, ResolvedType};
 use semantic_model::ScopeId;
@@ -35,11 +36,13 @@ impl super::BackgroundDocumentRequestHandler for GotoDefinition {
         _: Notifier,
         params: types::GotoDefinitionParams,
     ) -> Result<Option<types::GotoDefinitionResponse>> {
-        let document_path = snapshot
-            .url()
-            .to_file_path()
-            .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let document_path = Arc::new(
+            snapshot
+                .url()
+                .to_file_path()
+                .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?,
+        );
 
         let db = snapshot.db();
         let node_stack = db.indexer().node_stack(&document_path);
@@ -56,7 +59,7 @@ impl super::BackgroundDocumentRequestHandler for GotoDefinition {
             return Ok(None);
         };
 
-        let is_same_document = *declaration_path == document_path;
+        let is_same_document = *declaration_path == *document_path;
         create_location_response(
             is_python_module,
             is_same_document,
@@ -74,7 +77,7 @@ enum IsPythonModule {
 
 fn find_declaration<'a>(
     db: &'a SymbolTableDb,
-    path: &'a PathBuf,
+    path: &'a Arc<PathBuf>,
     scope: ScopeId,
     offset: u32,
     nodes: &Nodes,
@@ -84,12 +87,13 @@ fn find_declaration<'a>(
 
     let (path, declaration) = match node_with_parent.node() {
         AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, attr, .. }) => {
-            let mut type_inferer = TypeInferer::new(db, scope, path);
+            let mut type_inferer = TypeInferer::new(db, scope, path.clone());
             let (path, scope) = match type_inferer.infer_expr(value.as_ref(), nodes) {
                 ResolvedType::KnownType(PythonType::Class(class)) => {
                     (db.indexer().file_path(&class.file_id), class.body_scope)
                 }
-                ResolvedType::KnownType(PythonType::Module(file_id)) => {
+                ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                    let file_id = db.indexer().file_id(import_source.any_path()?);
                     (db.indexer().file_path(&file_id), ScopeId::global())
                 }
                 _ => return None,
@@ -108,7 +112,7 @@ fn find_declaration<'a>(
                 let arg = keyword.arg.as_ref()?;
                 arg.range().contains_inclusive(offset.into()).then_some(arg)
             })?;
-            let mut type_inferer = TypeInferer::new(db, scope, path);
+            let mut type_inferer = TypeInferer::new(db, scope, path.clone());
             let (path, scope) = match type_inferer.infer_expr(func.as_ref(), nodes) {
                 ResolvedType::KnownType(PythonType::Class(class)) => {
                     let path = db.indexer().file_path(&class.file_id);
@@ -144,7 +148,9 @@ fn find_declaration<'a>(
 
             // Recursively resolve import chains to find the original symbol declaration.
             // If the symbol isn't found in an import path, assume it refers to a Python module.
-            while let Some(source_path) = declaration.import_source() {
+            while let Some(source_path) =
+                declaration.import_source().and_then(ImportSource::any_path)
+            {
                 final_path = source_path;
                 let Some(imported_declaration) = db.symbol_declaration(
                     source_path,

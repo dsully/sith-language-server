@@ -1,6 +1,7 @@
 use std::{
     ops::{Index, IndexMut},
     path::PathBuf,
+    sync::Arc,
 };
 
 use python_ast_utils::nodes::NodeId;
@@ -85,18 +86,9 @@ pub enum DeclStmt {
     Class(ScopeId),
     TypeAlias,
     Assignment,
-    Import {
-        stub_source: Option<PathBuf>,
-        non_stub_source: Option<PathBuf>,
-    },
-    ImportStar {
-        stub_source: Option<PathBuf>,
-        non_stub_source: Option<PathBuf>,
-    },
-    ImportSegment {
-        stub_source: Option<PathBuf>,
-        non_stub_source: Option<PathBuf>,
-    },
+    Import(ImportSource),
+    ImportStar(ImportSource),
+    ImportSegment(ImportSource),
     ImportAlias(DeclId),
     /// Special-case: this used when we have the same import name multiple times in the source
     /// code. Example:
@@ -112,6 +104,67 @@ pub enum DeclStmt {
     SameImport(DeclId),
     AnnAssign,
     AugAssign,
+}
+
+#[derive(Debug, Default, Clone, Eq)]
+pub struct ImportSource {
+    pub(crate) stub: Option<Arc<PathBuf>>,
+    pub(crate) non_stub: Option<Arc<PathBuf>>,
+    pub(crate) is_thirdparty: bool,
+}
+
+impl ImportSource {
+    pub fn stub(path: PathBuf) -> Self {
+        Self {
+            stub: Some(Arc::new(path)),
+            non_stub: None,
+            is_thirdparty: false,
+        }
+    }
+
+    pub fn non_stub(path: PathBuf) -> Self {
+        Self {
+            stub: None,
+            non_stub: Some(Arc::new(path)),
+            is_thirdparty: false,
+        }
+    }
+
+    /// Returns the path to the source file for import-related declarations,
+    /// with preference given to stub sources over non-stub sources when available.
+    ///
+    /// Due to the way indexing works, this function always returns the indexed
+    /// path.
+    pub fn any_path(&self) -> Option<&Arc<PathBuf>> {
+        self.stub.as_ref().or(self.non_stub.as_ref())
+    }
+
+    pub fn stub_path(&self) -> Option<&Arc<PathBuf>> {
+        self.stub.as_ref()
+    }
+
+    pub fn non_stub_path(&self) -> Option<&Arc<PathBuf>> {
+        self.non_stub.as_ref()
+    }
+
+    pub fn is_unresolved(&self) -> bool {
+        self.stub.is_none() && self.non_stub.is_none()
+    }
+
+    pub fn is_thirdparty(&self) -> bool {
+        self.is_thirdparty
+    }
+}
+
+impl From<&PathBuf> for ImportSource {
+    fn from(path: &PathBuf) -> Self {
+        let ext = path.extension().expect("File to have extension!");
+        if ext == "pyi" {
+            Self::stub(path.to_path_buf())
+        } else {
+            Self::non_stub(path.to_path_buf())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -143,24 +196,13 @@ impl Declaration {
         )
     }
 
-    /// Returns the path to the source file for import-related declarations,
-    /// with preference given to stub sources over non-stub sources when available.
-    pub fn import_source(&self) -> Option<&PathBuf> {
+    pub fn import_source(&self) -> Option<&ImportSource> {
         match &self.kind {
             DeclarationKind::Stmt(
-                DeclStmt::Import {
-                    stub_source,
-                    non_stub_source,
-                }
-                | DeclStmt::ImportSegment {
-                    stub_source,
-                    non_stub_source,
-                }
-                | DeclStmt::ImportStar {
-                    stub_source,
-                    non_stub_source,
-                },
-            ) => stub_source.as_ref().or(non_stub_source.as_ref()),
+                DeclStmt::Import(import_source)
+                | DeclStmt::ImportSegment(import_source)
+                | DeclStmt::ImportStar(import_source),
+            ) => Some(import_source),
             _ => None,
         }
     }
@@ -177,35 +219,27 @@ impl Declaration {
     pub fn is_imported_module(&self, symbol_name: &str) -> bool {
         match &self.kind {
             DeclarationKind::Stmt(
-                DeclStmt::Import {
-                    stub_source: Some(stub_source),
-                    non_stub_source: None,
-                }
-                | DeclStmt::ImportSegment {
-                    stub_source: Some(stub_source),
-                    non_stub_source: None,
-                }
-                | DeclStmt::ImportStar {
-                    stub_source: Some(stub_source),
-                    non_stub_source: None,
-                },
-            ) => is_python_module(symbol_name, stub_source),
+                DeclStmt::Import(import_source)
+                | DeclStmt::ImportSegment(import_source)
+                | DeclStmt::ImportStar(import_source),
+            ) if import_source.stub.is_some() => {
+                is_python_module(symbol_name, import_source.stub.as_ref().unwrap())
+            }
             DeclarationKind::Stmt(
-                DeclStmt::Import {
-                    stub_source: None,
-                    non_stub_source: Some(non_stub_source),
-                }
-                | DeclStmt::ImportSegment {
-                    stub_source: None,
-                    non_stub_source: Some(non_stub_source),
-                }
-                | DeclStmt::ImportStar {
-                    stub_source: None,
-                    non_stub_source: Some(non_stub_source),
-                },
-            ) => is_python_module(symbol_name, non_stub_source),
+                DeclStmt::Import(import_source)
+                | DeclStmt::ImportSegment(import_source)
+                | DeclStmt::ImportStar(import_source),
+            ) if import_source.non_stub.is_some() => {
+                is_python_module(symbol_name, import_source.non_stub.as_ref().unwrap())
+            }
             _ => false,
         }
+    }
+}
+
+impl PartialEq for ImportSource {
+    fn eq(&self, other: &Self) -> bool {
+        self.stub == other.stub || self.non_stub == other.non_stub
     }
 }
 

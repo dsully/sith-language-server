@@ -69,11 +69,17 @@ impl<'a> Index<NodeId> for Nodes<'a> {
 pub struct NodeStack<'a> {
     curr_node: Option<NodeId>,
     nodes: Nodes<'a>,
+    is_thirdparty: bool,
 }
 
 impl<'a> NodeStack<'a> {
     pub fn build(mut self, ast: &'a [Stmt]) -> Self {
         self.visit_body(ast);
+        self
+    }
+
+    pub fn is_thirdparty(mut self, value: bool) -> Self {
+        self.is_thirdparty = value;
         self
     }
 
@@ -115,7 +121,13 @@ where
                     self.visit_decorator(decorator);
                 }
                 self.visit_parameters(parameters);
-                self.visit_body(body);
+                // If the current file is from the python stdlib or "site-packages"
+                // we should only visit the first statement of the function body.
+                if self.is_thirdparty && !body.is_empty() {
+                    self.visit_body(&body[..1]);
+                } else {
+                    self.visit_body(body);
+                }
             }
             Stmt::ClassDef(ast::ClassDefStmt {
                 body,

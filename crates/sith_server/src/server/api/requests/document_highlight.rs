@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use lsp_types::{self as types, request as req};
 use python_ast_utils::{identifier_from_node, node_at_offset, nodes::NodeStack};
 
@@ -25,11 +27,13 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         _: Notifier,
         params: types::DocumentHighlightParams,
     ) -> Result<Option<Vec<types::DocumentHighlight>>> {
-        let current_file = snapshot
-            .url()
-            .to_file_path()
-            .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        let current_file = Arc::new(
+            snapshot
+                .url()
+                .to_file_path()
+                .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
+                .with_failure_code(lsp_server::ErrorCode::InternalError)?,
+        );
         let db = snapshot.db();
         let document = snapshot.document();
         let position = params.text_document_position_params.position;
@@ -37,7 +41,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         let offset = position_to_offset(document.contents(), &position, document.index());
         let (scope_id, _) = db.find_enclosing_scope(&current_file, offset);
 
-        let ast = db.indexer().ast(&current_file);
+        let ast = db.indexer().ast_or_panic(&current_file);
         let node_stack = NodeStack::default().build(ast.suite());
 
         let Some(symbol_node) = node_at_offset(node_stack.nodes(), offset) else {

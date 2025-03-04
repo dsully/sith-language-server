@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::Arc};
 
 use lsp_types::{self as types, request as req, Url};
 use python_ast::{
@@ -51,7 +51,7 @@ fn references(
     snapshot: &DocumentSnapshot,
     params: types::ReferenceParams,
 ) -> Option<Vec<Location>> {
-    let current_file_path = snapshot.url().to_file_path().ok()?;
+    let current_file_path = Arc::new(snapshot.url().to_file_path().ok()?);
 
     let db = snapshot.db();
     let document = snapshot.document();
@@ -59,7 +59,7 @@ fn references(
     let index = document.index();
     let position = params.text_document_position.position;
     let offset = position_to_offset(document.contents(), &position, index);
-    let ast = db.indexer().ast(&current_file_path);
+    let ast = db.indexer().ast_or_panic(&current_file_path);
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;
@@ -92,13 +92,13 @@ fn references(
             snapshot.document().contents()
         } else {
             // TODO: log if this fails
-            &fs::read_to_string(path).ok()?
+            &fs::read_to_string(path.as_path()).ok()?
         };
 
         let index = LineIndex::from_source_text(source);
 
         for range in ranges {
-            let url = Url::from_file_path(path).ok()?;
+            let url = Url::from_file_path(path.as_path()).ok()?;
             locations.push(range.to_location(url, source, &index, snapshot.encoding()));
         }
     }
@@ -128,11 +128,11 @@ impl IncludeDeclaration {
 
 pub(super) struct ReferencesFinder<'db, 'p> {
     db: &'db SymbolTableDb,
-    current_file: &'p PathBuf,
+    current_file: &'p Arc<PathBuf>,
 }
 
 impl<'db, 'p> ReferencesFinder<'db, 'p> {
-    pub(super) fn new(db: &'db SymbolTableDb, current_file: &'p PathBuf) -> Self {
+    pub(super) fn new(db: &'db SymbolTableDb, current_file: &'p Arc<PathBuf>) -> Self {
         Self { db, current_file }
     }
 
@@ -149,7 +149,7 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
 
         let is_symbol_part_of_attr = matches!(symbol_node.node(), AnyNodeRef::AttributeExpr(_));
         let node_stack = NodeStack::default().build(suite);
-        let mut type_inferer = TypeInferer::new(self.db, scope_id, self.current_file);
+        let mut type_inferer = TypeInferer::new(self.db, scope_id, self.current_file.clone());
         let symbol_type = type_inferer.infer_node(symbol_node, node_stack.nodes());
 
         let current_file_id = self.db.indexer().file_id(self.current_file);
@@ -197,14 +197,14 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
                 is_symbol_part_of_attr
                     || table
                         .symbol_declaration(symbol_name, ScopeId::global(), DeclarationQuery::Last)
-                        .and_then(|decl| decl.import_source())
+                        .and_then(|decl| decl.import_source()?.any_path())
                         .is_some_and(|import_path| import_path == self.current_file)
             })
         {
             let path = self.db.indexer().file_path(file_id);
-            let suite = self.db.indexer().ast(path).suite();
+            let suite = self.db.indexer().ast_or_panic(path).suite();
             let node_stack = NodeStack::default().build(suite);
-            let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path);
+            let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path.clone());
             let references_visitor = ReferencesFinderVisitor::new(
                 table,
                 symbol_name,
@@ -279,7 +279,7 @@ impl<'a, 'table, 'nodes, 'st> ReferencesFinderVisitor<'a, 'table, 'nodes, 'st> {
     }
 }
 
-impl<'a, 'b, 'table, 'nodes> Visitor<'b> for ReferencesFinderVisitor<'a, 'table, 'nodes, '_>
+impl<'a, 'b> Visitor<'b> for ReferencesFinderVisitor<'a, '_, '_, '_>
 where
     'b: 'a,
 {
