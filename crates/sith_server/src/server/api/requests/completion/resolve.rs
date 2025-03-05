@@ -134,7 +134,7 @@ fn get_completion_item_documentation(
     }
 }
 
-fn get_module_documentation(db: &SymbolTableDb, path: &PathBuf) -> Option<String> {
+pub(crate) fn get_module_documentation(db: &SymbolTableDb, path: &PathBuf) -> Option<String> {
     // Check if the module was already indexed and get the first string expression
     // statement. Otherwise, we need to read the file contents and parse it.
     let ast = if db.indexer().is_indexed(path) {
