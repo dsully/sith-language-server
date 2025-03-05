@@ -638,6 +638,10 @@ impl<'db> TypeInferer<'db> {
             | AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. }) => {
                 self.infer_symbol(name, nodes, DeclarationQuery::First)
             }
+            AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+                module: Some(module),
+                ..
+            }) => self.infer_symbol(module, nodes, DeclarationQuery::First),
             _ => self.infer_expr(**node, nodes),
         }
     }
@@ -955,6 +959,17 @@ impl<'db> TypeInferer<'db> {
                     .unwrap();
 
                 self.infer_imported_symbol(import_stmt, name, import_source)
+                    .unwrap_or(ResolvedType::Unknown)
+            }
+            AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+                module: Some(module),
+                ..
+            }) => {
+                let Some(import_source) = declaration.import_source() else {
+                    return ResolvedType::Unknown;
+                };
+
+                self.infer_imported_symbol(declaration_node, module, import_source)
                     .unwrap_or(ResolvedType::Unknown)
             }
             AnyNodeRef::Parameter(python_ast::Parameter { annotation, .. }) => {
