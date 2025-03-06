@@ -274,6 +274,10 @@ impl std::fmt::Debug for Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.error, self.error.source().unwrap())
+        if let Some(error_source) = self.error.source() {
+            write!(f, "{}: {}", self.error, error_source)
+        } else {
+            write!(f, "{}", self.error)
+        }
     }
 }
