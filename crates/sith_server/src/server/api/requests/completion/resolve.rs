@@ -45,25 +45,13 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
         _notifier: super::Notifier,
         mut original_completion: CompletionItem,
     ) -> Result<CompletionItem> {
-        let data = match original_completion.data.take() {
-            Some(it) => it,
-            None => return Ok(original_completion),
-        };
-
-        let completion_item_data: CompletionItemData =
-            serde_json::from_value(data).expect("no error when deserializing!");
-
-        original_completion.documentation = get_completion_item_documentation(
-            &snapshot,
-            completion_item_data,
-            &original_completion,
-        )
-        .map(|doc| {
-            Documentation::MarkupContent(MarkupContent {
-                kind: lsp_types::MarkupKind::Markdown,
-                value: doc,
-            })
-        });
+        original_completion.documentation =
+            get_completion_item_documentation(&snapshot, &mut original_completion).map(|doc| {
+                Documentation::MarkupContent(MarkupContent {
+                    kind: lsp_types::MarkupKind::Markdown,
+                    value: doc,
+                })
+            });
 
         Ok(original_completion)
     }
@@ -71,9 +59,12 @@ impl BackgroundDocumentRequestHandler for ResolveCompletionItem {
 
 fn get_completion_item_documentation(
     snapshot: &DocumentSnapshot,
-    completion_item_data: CompletionItemData,
-    original_completion: &CompletionItem,
+    original_completion: &mut CompletionItem,
 ) -> Option<String> {
+    let data = original_completion.data.take()?;
+    let completion_item_data: CompletionItemData =
+        serde_json::from_value(data).expect("no error when deserializing!");
+
     let db = snapshot.db();
     match completion_item_data.payload()? {
         CompletionItemDataPayload::Module(completion_item_module_data) => {
@@ -83,13 +74,12 @@ fn get_completion_item_documentation(
             match completion_item_symbol_data.origin() {
                 CompletionItemOrigin::Builtin => {
                     let interpreter = snapshot.client_settings().interpreter()?;
-                    match get_python_doc(interpreter, &original_completion.label) {
-                        Ok(doc) => doc,
-                        Err(err) => {
-                            tracing::error!("Failed to get documentation for builtin symbol with Python script: {err}");
-                            None
-                        }
-                    }
+                    get_python_doc(interpreter, &original_completion.label).unwrap_or_else(|err| {
+                        tracing::error!(
+                            "Failed to get builtin symbol documentation with Python script: {err}"
+                        );
+                        None
+                    })
                 }
                 _ => {
                     let non_stub_path = db
