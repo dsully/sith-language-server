@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use lsp_types::{self as types, request as req, HoverContents, MarkupContent, MarkupKind};
-use python_ast::AnyNodeRef;
+use python_ast::{AnyNodeRef, BoolOp, CmpOp, UnaryOp};
 use python_ast_utils::{
     identifier_from_node, node_at_offset,
     nodes::{NodeId, NodeStack, NodeWithParent, Nodes},
 };
 use python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use semantic_model::{
     db::{FileId, SymbolTableDb},
     declaration::DeclarationQuery,
@@ -62,6 +62,23 @@ pub(crate) fn hover(
     let node = node_at_offset(nodes, offset)?;
     let hover_pos = HoverPosition::from_node(offset.into(), node, node_stack.nodes());
 
+    if let HoverPosition::Keyword(keyword) = hover_pos {
+        let doc_str = get_python_doc(snapshot.client_settings().interpreter()?, keyword)
+            .unwrap_or_else(|err| {
+                tracing::error!(
+                    "Failed to get builtin symbol documentation with Python script: {err}"
+                );
+                None
+            })?;
+        return Some(types::Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: doc_str,
+            }),
+            range: None,
+        });
+    }
+
     if !should_show_docs(&hover_pos) {
         return None;
     }
@@ -99,8 +116,8 @@ fn should_show_docs(hover_pos: &HoverPosition) -> bool {
         hover_pos,
         HoverPosition::Id
             | HoverPosition::Attr
-            | HoverPosition::Function
-            | HoverPosition::Class
+            | HoverPosition::FunctionName
+            | HoverPosition::ClassName
             | HoverPosition::Call
     )
 }
@@ -156,7 +173,7 @@ fn get_docs_for_non_stub(
 }
 
 #[derive(Debug)]
-enum HoverPosition {
+enum HoverPosition<'a> {
     /// Hovering over an identifier (e.g., variable name, function name)
     Id,
     /// Hovering over an assignment statement
@@ -166,16 +183,18 @@ enum HoverPosition {
     /// Hovering over an attribute access (e.g., `object.attribute`)
     Attr,
     /// Hovering over a function definition
-    Function,
+    FunctionName,
     /// Hovering over a class definition
-    Class,
+    ClassName,
     /// Hovering over a function call expression
     Call,
+    /// Hovering over a keyword
+    Keyword(&'a str),
     /// Hovering over other things that we don't care about (e.g. number literals, strings, etc.)
     Other,
 }
 
-impl HoverPosition {
+impl HoverPosition<'_> {
     fn from_node(offset: TextSize, node: &NodeWithParent, nodes: &Nodes) -> Self {
         match node.node() {
             AnyNodeRef::NameExpr(_) => {
@@ -202,17 +221,289 @@ impl HoverPosition {
             {
                 Self::Id
             }
+            AnyNodeRef::StmtImport(import)
+                if import
+                    .names
+                    .iter()
+                    .any(|name| name.range().contains(offset)) =>
+            {
+                Self::Id
+            }
+            AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+                module: Some(module),
+                names,
+                ..
+            }) if module.range().contains(offset)
+                || names.iter().any(|name| name.range().contains(offset)) =>
+            {
+                Self::Id
+            }
+            AnyNodeRef::Alias(_) => Self::Id,
+            AnyNodeRef::AttributeExpr(_) => Self::Attr,
+            AnyNodeRef::StmtClassDef(class) if class.name.range.contains(offset) => Self::ClassName,
+            AnyNodeRef::StmtFunctionDef(func) if func.name.range.contains(offset) => {
+                Self::FunctionName
+            }
+            AnyNodeRef::CallExpr(_) => Self::Call,
+            AnyNodeRef::Parameter(_) => Self::Param,
+            _ => Self::from_keyword(offset, node),
+        }
+    }
+
+    fn from_keyword(offset: TextSize, node: &NodeWithParent) -> Self {
+        match node.node() {
+            AnyNodeRef::YieldExpr(_)
+                if keyword_range(node.range().start(), "yield").contains(offset) =>
+            {
+                Self::Keyword("yield")
+            }
+            AnyNodeRef::YieldFromExpr(_) => {
+                let yield_range = keyword_range(node.range().start(), "yield");
+                let from_range = keyword_range(yield_range.range().add_end(1.into()).end(), "from");
+                if yield_range.contains(offset) {
+                    Self::Keyword("yield")
+                } else if from_range.contains(offset) {
+                    Self::Keyword("from")
+                } else {
+                    Self::Other
+                }
+            }
+            AnyNodeRef::BooleanLiteralExpr(bool_literal) => {
+                if bool_literal.value {
+                    Self::Keyword("True")
+                } else {
+                    Self::Keyword("False")
+                }
+            }
+            AnyNodeRef::NoneLiteralExpr(_) => Self::Keyword("None"),
+            AnyNodeRef::BoolOpExpr(python_ast::BoolOpExpr {
+                op: BoolOp::Or,
+                values,
+                ..
+            }) if values.first().is_some_and(|expr| {
+                keyword_range(expr.range().add_end(1.into()).end(), "or").contains(offset)
+            }) =>
+            {
+                Self::Keyword("or")
+            }
+            AnyNodeRef::BoolOpExpr(python_ast::BoolOpExpr {
+                op: BoolOp::And,
+                values,
+                ..
+            }) if values.first().is_some_and(|expr| {
+                keyword_range(expr.range().add_end(1.into()).end(), "and").contains(offset)
+            }) =>
+            {
+                Self::Keyword("and")
+            }
+            AnyNodeRef::UnaryOpExpr(python_ast::UnaryOpExpr {
+                op: UnaryOp::Not, ..
+            }) if keyword_range(node.range().start(), "not").contains(offset) => {
+                Self::Keyword("not")
+            }
+            AnyNodeRef::StmtBreak(_) => Self::Keyword("break"),
+            AnyNodeRef::StmtContinue(_) => Self::Keyword("continue"),
+            AnyNodeRef::StmtPass(_) => Self::Keyword("pass"),
+            AnyNodeRef::StmtDelete(_)
+                if keyword_range(node.range().start(), "del").contains(offset) =>
+            {
+                Self::Keyword("del")
+            }
+            AnyNodeRef::StmtGlobal(_)
+                if keyword_range(node.range().start(), "global").contains(offset) =>
+            {
+                Self::Keyword("global")
+            }
+            AnyNodeRef::StmtNonlocal(_)
+                if keyword_range(node.range().start(), "nonlocal").contains(offset) =>
+            {
+                Self::Keyword("nonlocal")
+            }
+            AnyNodeRef::StmtReturn(_)
+                if keyword_range(node.range().start(), "return").contains(offset) =>
+            {
+                Self::Keyword("return")
+            }
+            AnyNodeRef::StmtClassDef(_)
+                if keyword_range(node.range().start(), "class").contains(offset) =>
+            {
+                Self::Keyword("class")
+            }
+            AnyNodeRef::LambdaExpr(_)
+                if keyword_range(node.range().start(), "lambda").contains(offset) =>
+            {
+                Self::Keyword("lambda")
+            }
+            AnyNodeRef::StmtRaise(_)
+                if keyword_range(node.range().start(), "raise").contains(offset) =>
+            {
+                Self::Keyword("raise")
+            }
+            AnyNodeRef::StmtWhile(_)
+                if keyword_range(node.range().start(), "while").contains(offset) =>
+            {
+                Self::Keyword("while")
+            }
+            AnyNodeRef::StmtFunctionDef(func) => {
+                if func.is_async {
+                    let async_range = keyword_range(node.range().start(), "async");
+                    let def_range = keyword_range(async_range.add_end(1.into()).end(), "def");
+                    if async_range.contains(offset) {
+                        return Self::Keyword("async");
+                    } else if def_range.contains(offset) {
+                        return Self::Keyword("def");
+                    }
+                } else if keyword_range(node.range().start(), "def").contains(offset) {
+                    return Self::Keyword("def");
+                }
+                Self::Other
+            }
+            AnyNodeRef::IfExpr(python_ast::IfExpr { body, test, .. }) => {
+                let if_range = keyword_range(body.range().add_end(1.into()).end(), "if");
+                let else_range = keyword_range(test.range().add_end(1.into()).end(), "else");
+                if if_range.contains(offset) {
+                    Self::Keyword("if")
+                } else if else_range.contains(offset) {
+                    Self::Keyword("else")
+                } else {
+                    Self::Other
+                }
+            }
+            AnyNodeRef::StmtIf(python_ast::IfStmt {
+                elif_else_clauses, ..
+            }) => {
+                // Here we are only checking for the "else" keyword but that's fine since "else"
+                // and "elif" have the same length
+                let is_in_clause = elif_else_clauses
+                    .iter()
+                    .any(|clause| keyword_range(clause.range().start(), "else").contains(offset));
+
+                // For "else" and "elif" we return `Keyword("if")` because they all have the same
+                // documentation.
+                if keyword_range(node.range().start(), "if").contains(offset) || is_in_clause {
+                    Self::Keyword("if")
+                } else {
+                    Self::Other
+                }
+            }
+            AnyNodeRef::StmtTry(python_ast::TryStmt {
+                handlers,
+                finalbody,
+                ..
+            }) => {
+                if keyword_range(node.range().start(), "try").contains(offset) {
+                    Self::Keyword("try")
+                } else if handlers.last().is_some_and(|last| {
+                    keyword_range(last.range().end(), "finally").contains(offset)
+                }) {
+                    Self::Keyword("finally")
+                } else if finalbody
+                    .last()
+                    .is_some_and(|last| keyword_range(last.range().end(), "else").contains(offset))
+                {
+                    Self::Keyword("try")
+                } else {
+                    Self::Other
+                }
+            }
+            AnyNodeRef::ExceptHandlerExceptHandler(_)
+                if keyword_range(node.range().start(), "except").contains(offset) =>
+            {
+                Self::Keyword("except")
+            }
+            AnyNodeRef::StmtFor(for_stmt) => {
+                if for_stmt.is_async {
+                    let async_range = keyword_range(node.range().start(), "async");
+                    let def_range = keyword_range(async_range.add_end(1.into()).end(), "for");
+                    if async_range.contains(offset) {
+                        return Self::Keyword("async");
+                    } else if def_range.contains(offset) {
+                        return Self::Keyword("for");
+                    }
+                } else if keyword_range(node.range().start(), "for").contains(offset) {
+                    return Self::Keyword("for");
+                }
+                Self::Other
+            }
+            AnyNodeRef::StmtImport(_)
+                if keyword_range(node.range().start(), "import").contains(offset) =>
+            {
+                Self::Keyword("import")
+            }
             AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
                 module: Some(module),
                 ..
-            }) if module.range().contains(offset) => Self::Id,
-            AnyNodeRef::Alias(_) => Self::Id,
-            AnyNodeRef::AttributeExpr(_) => Self::Attr,
-            AnyNodeRef::StmtClassDef(_) => Self::Class,
-            AnyNodeRef::StmtFunctionDef(_) => Self::Function,
-            AnyNodeRef::CallExpr(_) => Self::Call,
-            AnyNodeRef::Parameter(_) => Self::Param,
+            }) if keyword_range(module.range.add_end(1.into()).end(), "import")
+                .contains(offset) =>
+            {
+                Self::Keyword("import")
+            }
+            AnyNodeRef::StmtImportFrom(_)
+                if keyword_range(node.range().start(), "from").contains(offset) =>
+            {
+                Self::Keyword("from")
+            }
+            AnyNodeRef::StmtWith(with) => {
+                if with.is_async {
+                    let async_range = keyword_range(node.range().start(), "async");
+                    let with_range = keyword_range(async_range.add_end(1.into()).end(), "with");
+                    if async_range.contains(offset) {
+                        return Self::Keyword("async");
+                    } else if with_range.contains(offset) {
+                        return Self::Keyword("with");
+                    }
+                } else if keyword_range(node.range().start(), "with").contains(offset) {
+                    return Self::Keyword("with");
+                }
+                Self::Other
+            }
+            AnyNodeRef::StmtMatch(python_ast::MatchStmt { cases, .. }) => {
+                if keyword_range(node.range().start(), "match").contains(offset) {
+                    Self::Keyword("match")
+                } else if cases
+                    .iter()
+                    .any(|case| keyword_range(case.range.start(), "case").contains(offset))
+                {
+                    Self::Keyword("case")
+                } else {
+                    Self::Other
+                }
+            }
+            AnyNodeRef::StmtTypeAlias(_)
+                if keyword_range(node.range().start(), "type").contains(offset) =>
+            {
+                Self::Keyword("type")
+            }
+            AnyNodeRef::CompareExpr(python_ast::CompareExpr {
+                ops,
+                left,
+                comparators,
+                ..
+            }) if ops.iter().any(|op| matches!(op, CmpOp::In | CmpOp::Is)) => {
+                // creates an iterator that yields a tuple with an operator and its precedent
+                // expression.
+                ops.iter()
+                    .zip(
+                        std::iter::once(left.as_ref())
+                            .chain(comparators.iter().take(comparators.len() - 1)),
+                    )
+                    // Check if the `offset` is in the "in" or "is" keywords
+                    .find(|(op, expr)| {
+                        keyword_range(expr.range().add_end(1.into()).end(), op.as_str())
+                            .contains(offset)
+                    })
+                    .map(|(op, _)| match op {
+                        CmpOp::Is => Self::Keyword("is"),
+                        CmpOp::In => Self::Keyword("in"),
+                        _ => unreachable!(),
+                    })
+                    .unwrap_or(Self::Other)
+            }
             _ => Self::Other,
         }
     }
+}
+
+fn keyword_range(start_offset: TextSize, keyword: &str) -> TextRange {
+    TextRange::new(start_offset, start_offset + TextSize::of(keyword))
 }
