@@ -6,10 +6,11 @@ use rustc_hash::FxHashMap;
 use semantic_model::db::{Source, SymbolTableDb};
 use std::collections::BTreeMap;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::edit::DocumentVersion;
+use crate::util::{convert_url_to_path, is_url_unnamed};
 use crate::Document;
 
 use super::settings::ResolvedClientSettings;
@@ -210,17 +211,12 @@ impl Workspaces {
     }
 
     pub(super) fn update_ast(&mut self, document_url: &Url, content: Source) -> crate::Result<()> {
-        let db = self
-            .workspace_for_url_mut(document_url)
-            .context(format!(
-                "Failed to get workspace for document `{document_url}`"
-            ))?
-            .symbol_table_db
-            .make_mut();
+        let workspace = self.workspace_for_url_mut(document_url).context(format!(
+            "Failed to get workspace for document `{document_url}`"
+        ))?;
+        let db = workspace.symbol_table_db.make_mut();
 
-        let file_path = document_url
-            .to_file_path()
-            .expect("Url is not filepath like");
+        let file_path = convert_url_to_path(db.indexer().root_path(), document_url);
         db.indexer_mut().add_or_update_file(file_path, content);
 
         Ok(())
@@ -229,11 +225,20 @@ impl Workspaces {
     pub(super) fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
         if let Some(workspace) = self.workspace_for_url_mut(url) {
             let db = workspace.symbol_table_db.make_mut();
-            db.indexer_mut().add_or_update_file(
-                url.to_file_path().expect("Url is not filepath like"),
-                Source::New(&contents),
-            );
-            workspace.open_documents.open(url, contents, version);
+
+            if is_url_unnamed(url) {
+                show_warn_msg!("You are currently editing an in-memory file, some LSP features may not work properly!");
+            }
+
+            if url.path() == "/" && workspace.open_documents.contains(url) {
+                tracing::error!("Tried to open multiple Neovim unnamed buffers!");
+                show_err_msg!("SithLSP doesn't support multiple Neovim unnamed buffers!");
+            } else {
+                let file_path = convert_url_to_path(db.indexer().root_path(), url);
+                db.indexer_mut()
+                    .add_or_update_file(file_path, Source::New(&contents));
+                workspace.open_documents.open(url, contents, version);
+            }
         }
     }
 
@@ -252,7 +257,7 @@ impl Workspaces {
         self.workspace_for_url(url).map_or_else(
             || {
                 tracing::warn!(
-                    "Workspace not found for {url}. Global settings will be used for this document"
+                    "Workspace not found for `{url}`. Global settings will be used for this document"
                 );
                 ResolvedClientSettings::global(global_settings)
             },
@@ -263,31 +268,43 @@ impl Workspaces {
     }
 
     fn workspace_for_url(&self, url: &Url) -> Option<&Workspace> {
-        Some(self.entry_for_url(url)?.1)
+        self.entry_for_url(url)
     }
 
     fn workspace_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
-        Some(self.entry_for_url_mut(url)?.1)
+        self.entry_for_url_mut(url)
     }
 
-    fn entry_for_url(&self, url: &Url) -> Option<(&Path, &Workspace)> {
+    fn entry_for_url(&self, url: &Url) -> Option<&Workspace> {
+        if is_url_unnamed(url) {
+            return self.workspaces.values().next();
+        }
+
         let path = url.to_file_path().ok()?;
         self.workspaces
             .range(..path)
             .next_back()
-            .map(|(path, workspace)| (path.as_path(), workspace))
+            .map(|(_, workspace)| workspace)
     }
 
-    fn entry_for_url_mut(&mut self, url: &Url) -> Option<(&Path, &mut Workspace)> {
+    fn entry_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
+        if is_url_unnamed(url) {
+            return self.workspaces.values_mut().next();
+        }
+
         let path = url.to_file_path().ok()?;
         self.workspaces
             .range_mut(..path)
             .next_back()
-            .map(|(path, workspace)| (path.as_path(), workspace))
+            .map(|(_, workspace)| workspace)
     }
 }
 
 impl OpenDocuments {
+    fn contains(&self, url: &Url) -> bool {
+        self.documents.contains_key(url)
+    }
+
     fn snapshot(&self, url: &Url) -> Option<DocumentRef> {
         Some(self.documents.get(url)?.make_ref())
     }

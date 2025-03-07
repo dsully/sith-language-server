@@ -13,6 +13,7 @@ use settings::ResolvedClientSettings;
 pub(crate) use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
 
 use crate::edit::DocumentVersion;
+use crate::util::convert_url_to_path;
 use crate::PositionEncoding;
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -59,13 +60,14 @@ impl Session {
     }
 
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
+        let db = self.workspaces.db_snapshot(url)?;
         Some(DocumentSnapshot {
+            url: Url::from_file_path(convert_url_to_path(db.indexer().root_path(), url)).unwrap(),
             client_settings: self.workspaces.client_settings(url, &self.global_settings),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             document_ref: self.workspaces.document_snapshot(url)?,
-            symbol_table_db_ref: self.workspaces.db_snapshot(url)?,
+            symbol_table_db_ref: db,
             position_encoding: self.position_encoding,
-            url: url.clone(),
         })
     }
 
