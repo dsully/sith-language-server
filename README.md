@@ -12,11 +12,11 @@ An experimental language server for the Python programming language.
 - 🔍 Find references
 - 🖊️ Autocompletion
 - 📝 Element renaming
-- 🗨️ Hover to view details on variables, functions, and more (_can only show documentation for now_)
+- 🗨️ Hover to view details on variables, functions, and more (_only shows documentation for now_)
 - 💅 Code formatting and linting powered by [Ruff](https://github.com/astral-sh/ruff)
 - 💡 Highlighting of symbol references
 - 🐍 Automatically detect the Python interpreter being used by your project
-- ... and many more to come, stay tuned!
+- ... and many more!
 
 <details>
 <summary>LSP methods implemented so far</summary>
@@ -32,15 +32,20 @@ An experimental language server for the Python programming language.
 - textDocument/didClose
 - textDocument/rename
 - textDocument/prepareRename
+- textDocument/hover
+- textDocument/documentSymbol
+- textDocument/codeAction
+- workspace/executeCommand
 - workspace/didChangeWorkspaceFolders
 - completionItem/resolve
+- codeAction/resolve
 
 </details>
 
 ## How to use
 
 You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
-build it manually following the steps bellow.
+build it manually following the steps bellow. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the file with the `.vsix` extension.
 
 ### Building the project
 
@@ -60,11 +65,12 @@ $ cargo build --release
 The binary will be located in the `target/release` folder. You should place the binary in `$PATH` or,
 if you're using VSCode, you can use the `sith.executable` setting option.
 
-### Installing the VSCode extension
+### Building the VSCode extension
 
-It's probably better to disable the `Python` or `Pylance` extensions, from Microsoft, to avoid any conflicts.
+It's probably better to disable the `Python` or `Pylance` extensions, from Microsoft, to avoid any conflicts when
+using this extension.
 
-You can install the VSCode extension manually with
+You can build the VSCode extension manually with
 
 ```sh
 # First we need to build the extension package
@@ -76,7 +82,7 @@ $ npm install
 $ npm run compile
 $ vsce package
 # Now manually install the extension
-$ code --install-extension sith-language-server-0.1.0.vsix
+$ code --install-extension sith-language-server-*.vsix
 ```
 
 ### Neovim Configuration
@@ -95,9 +101,7 @@ vim.api.nvim_create_autocmd("FileType", {
       cmd = { "/path/to/sith-lsp" },
       init_options = {
         settings = {
-          -- This setting is required for SithLSP to work properly.
-          -- Not settings this will result in limited functionality.
-          interpreter = "/path/to/python"
+          -- Settings for the server goes here.
         },
       },
     })
