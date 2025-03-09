@@ -47,6 +47,7 @@ struct WorkspaceSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RuffOptions {
+    enable: Option<bool>,
     path: Option<String>,
     format: Option<FormatOptions>,
     lint: Option<LintOptions>,
@@ -105,6 +106,7 @@ impl Default for InitializationOptions {
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     interpreter: Option<String>,
+    ruff_enable: bool,
     ruff_path: Option<String>,
     format_enable: bool,
     format_args: Vec<String>,
@@ -201,6 +203,11 @@ impl ResolvedClientSettings {
             interpreter: Self::resolve_optional(all_settings, |settings| {
                 settings.interpreter.clone()
             }),
+            ruff_enable: Self::resolve_or(
+                all_settings,
+                |settings| settings.ruff.as_ref()?.enable,
+                ruff_path.is_some(),
+            ),
             format_enable: Self::resolve_or(
                 all_settings,
                 |settings| settings.ruff.as_ref()?.format.as_ref()?.enable,
@@ -265,7 +272,7 @@ impl ResolvedClientSettings {
     }
 
     pub(crate) fn is_format_enabled(&self) -> bool {
-        self.format_enable
+        self.ruff_enable && self.format_enable
     }
 
     pub(crate) fn format_args(&self) -> &[String] {
@@ -277,7 +284,7 @@ impl ResolvedClientSettings {
     }
 
     pub(crate) fn is_lint_enabled(&self) -> bool {
-        self.lint_enable
+        self.ruff_enable && self.lint_enable
     }
 
     pub(crate) fn lint_args(&self) -> &[String] {

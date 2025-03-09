@@ -72,6 +72,12 @@
                     "scope": "resource",
                     "type": "string"
                 },
+                "sith.ruff.enable": {
+                    "default": null,
+                    "markdownDescription": "Whether to enable Ruff.",
+                    "scope": "window",
+                    "type": "boolean"
+                },
                 "sith.ruff.path": {
                     "default": null,
                     "markdownDescription": "Path to the `ruff` executable, e.g., `[\"/path/to/ruff\"]`.",
@@ -79,7 +85,7 @@
                     "type": "string"
                 },
                 "sith.ruff.format.enable": {
-                    "default": true,
+                    "default": null,
                     "markdownDescription": "Whether to enable Ruff formatting.",
                     "scope": "window",
                     "type": "boolean"
@@ -94,7 +100,7 @@
                     "type": "array"
                 },
                 "sith.ruff.lint.enable": {
-                    "default": true,
+                    "default": null,
                     "markdownDescription": "Whether to enable Ruff linting.",
                     "scope": "window",
                     "type": "boolean"
@@ -147,26 +153,26 @@
         },
         "commands": [
             {
-              "title": "Fix all auto-fixable problems",
-              "category": "SithLSP",
-              "command": "sith.executeAutofix"
+                "title": "Fix all auto-fixable problems",
+                "category": "SithLSP",
+                "command": "sith.executeAutofix"
             },
             {
-              "title": "Format document",
-              "category": "SithLSP",
-              "command": "sith.executeFormat"
+                "title": "Format document",
+                "category": "SithLSP",
+                "command": "sith.executeFormat"
             },
             {
-              "title": "Organize imports",
-              "category": "SithLSP",
-              "command": "sith.executeOrganizeImports"
+                "title": "Organize imports",
+                "category": "SithLSP",
+                "command": "sith.executeOrganizeImports"
             },
             {
-              "title": "Show server logs",
-              "category": "SithLSP",
-              "command": "sith.showServerLogs"
+                "title": "Show server logs",
+                "category": "SithLSP",
+                "command": "sith.showServerLogs"
             }
-          ]      
+        ]
     },
     "scripts": {
         "compile": "npm run check-types && npm run esbuild-bundle",
