@@ -45,7 +45,7 @@ An experimental language server for the Python programming language.
 ## How to use
 
 You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
-build it manually following the steps bellow. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the file with the `.vsix` extension.
+build it manually following the steps bellow. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the `.vsix` file.
 
 ### Building the project
 
@@ -102,6 +102,12 @@ vim.api.nvim_create_autocmd("FileType", {
       init_options = {
         settings = {
           -- Settings for the server goes here.
+          -- Config example
+          ruff = {
+            lint = {
+              enable = true
+            }
+          }
         },
       },
     })
@@ -109,7 +115,29 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 ```
 
+### Helix Configuration
+
+Add this to your `languages.toml` config file.
+
+```toml
+[language-server.sith-lsp]
+command = "/path/to/sith-lsp"
+
+# Config example
+[language-server.sith-lsp.config.settings.ruff.lint]
+enable = true
+
+[[language]]
+name = "python"
+language-servers = [
+  "sith-lsp",
+]
+
+```
+
 # Settings
+
+You can ommit the `sith` prefix from the settings if you are not on **VSCode**.
 
 ### sith.executable
 
@@ -121,6 +149,8 @@ Path to the language server executable.
 - default: `sith-lsp`
 
 ### sith-language-server.trace.server
+
+**NOTE:** This setting is only valid in the VSCode extension.
 
 Traces the communication between VS Code and the language server.
 
@@ -151,6 +181,13 @@ If this setting is set `sith` won't search automatically for a Python interprete
 - type: `string`
 - default: `null`
 
+### sith.ruff.enable
+
+Whether to enable Ruff.
+
+- type: `boolean`
+- default: `true` if `sith.ruff.path` is set, `false` otherwise.
+
 ### sith.ruff.path
 
 Path to the `ruff` executable, e.g., `[\"/path/to/ruff\"]`.
@@ -163,7 +200,7 @@ Path to the `ruff` executable, e.g., `[\"/path/to/ruff\"]`.
 Whether to enable Ruff formatting.
 
 - type: `boolean`
-- default: `true`
+- default: `true` if `sith.ruff.path` is set, `false` otherwise.
 
 ### sith.ruff.format.args
 
@@ -177,7 +214,7 @@ Additional command-line arguments to pass to `ruff format`, e.g., `\"args\": [\"
 Whether to enable Ruff linting.
 
 - type: `boolean`
-- default: `true`
+- default: `true` if `sith.ruff.path` is set, `false` otherwise.
 
 ### sith.ruff.lint.args
 
