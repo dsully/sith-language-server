@@ -149,6 +149,10 @@ pub(super) fn generate_ruff_lint_diagnostics(
 ) -> Result<Vec<Diagnostic>> {
     let settings = snapshot.client_settings();
 
+    if !settings.is_lint_enabled() {
+        return Ok(vec![]);
+    }
+
     let Some(ruff_path) = settings.ruff_path() else {
         tracing::warn!("Ruff path was not set in settings!");
         show_warn_msg!("Ruff path was not set in settings!");

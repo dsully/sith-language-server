@@ -1,6 +1,6 @@
 [package]
 name = "sith-lsp"
-version = "0.2.0-alpha"
+version = "0.2.1-alpha"
 edition = "2021"
 repository = "https://github.com/LaBatata101/sith-language-server"
 authors = ["LaBatata101 <labatata101@gmail.com>"]
@@ -8,6 +8,13 @@ readme = "README.md"
 license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+include = [
+    "Cargo.toml",
+    "crates/**",
+    "src/**",
+    "README.md",
+    "LICENSE"
+]
 
 [workspace]
 members = ["crates/*"]

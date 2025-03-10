@@ -22,6 +22,7 @@ export type Format = {
 };
 
 export type Ruff = {
+    enable: boolean;
     path: string;
     format: Format;
     lint: Lint;
@@ -64,6 +65,7 @@ export function getWorkspaceSettings(namespace: string, workspace: WorkspaceFold
         interpreter,
         ruff: {
             path: config.get<string>("ruff.path"),
+            enable: config.get<boolean>("ruff.enable"),
             format: {
                 enable: config.get<boolean>("ruff.format.enable") ?? true,
                 args: config.get<string[]>("ruff.format.args") ?? [],
@@ -95,7 +97,8 @@ export function getGlobalSettings(namespace: string): ISettings {
         executable: getGlobalValue<string>(config, "executable", "sith-lsp"),
         interpreter: getOptionalGlobalValue<string>(config, "interpreter"),
         ruff: {
-            path: config.get<string>("ruff.path"),
+            path: getOptionalGlobalValue<string>(config, "ruff.path"),
+            enable: getOptionalGlobalValue<boolean>(config, "ruff.enable"),
             format: {
                 enable: getGlobalValue<boolean>(config, "ruff.format.enable", true),
                 args: getGlobalValue<string[]>(config, "ruff.format.args", []),
@@ -119,6 +122,7 @@ export function checkIfConfigurationChanged(
         `${namespace}.executable`,
         `${namespace}.interpreter`,
         `${namespace}.ruff.path`,
+        `${namespace}.ruff.enable`,
         `${namespace}.ruff.format.args`,
         `${namespace}.ruff.format.enable`,
         `${namespace}.ruff.lint.enable`,
