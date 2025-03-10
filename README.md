@@ -45,7 +45,8 @@ An experimental language server for the Python programming language.
 ## How to use
 
 You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
-build it manually following the steps bellow. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the `.vsix` file.
+build it manually following the steps below. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the `.vsix` file.
+
 
 ### Building the project
 
