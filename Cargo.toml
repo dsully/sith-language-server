@@ -144,7 +144,7 @@ pr-run-mode = "skip"
 # Which phase dist should use to create the GitHub release
 github-release = "announce"
 # Whether CI should include auto-generated code to build local artifacts
-build-local-artifacts = false
+build-local-artifacts = true
 # Local artifacts jobs to run in CI
 local-artifacts-jobs = ["./build-vscode-extension"]
 # Whether to install an updater program
