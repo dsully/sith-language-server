@@ -1,6 +1,6 @@
 [package]
 name = "sith_server"
-version = "0.2.1-alpha"
+version = "0.2.2-alpha"
 publish = false
 edition = "2021"
 
