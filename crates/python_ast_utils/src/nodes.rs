@@ -132,10 +132,14 @@ where
             Stmt::ClassDef(ast::ClassDefStmt {
                 body,
                 decorator_list,
+                arguments,
                 ..
             }) => {
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
                 }
                 self.visit_body(body);
             }

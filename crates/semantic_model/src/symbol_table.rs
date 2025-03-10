@@ -424,6 +424,7 @@ where
                 range,
                 body,
                 decorator_list,
+                arguments,
                 ..
             }) => {
                 let (decl_id, symbol_id) = self.push_declaration(
@@ -436,6 +437,9 @@ where
 
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
                 }
                 self.flags.insert(VisitorFlags::IN_CLASS);
                 self.curr_scope = self.push_scope(ScopeKind::Class, *range);
