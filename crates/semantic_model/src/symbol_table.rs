@@ -320,7 +320,13 @@ impl<'a> SymbolTableBuilder<'a> {
             .get(self.curr_scope)
             .unwrap()
             .parent()
-            .expect("attempted to pop without scope");
+            .unwrap_or_else(|| {
+                panic!(
+                    "attempted to pop without scope in file `{}` on node: {:#?}",
+                    self.file_info.path.display(),
+                    self.curr_node.and_then(|node_id| self.nodes.get(node_id))
+                )
+            });
     }
 
     fn push_node(&mut self, node: impl Into<AnyNodeRef<'a>>) -> NodeId {
