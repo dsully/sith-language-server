@@ -135,6 +135,9 @@ pub use document_link::*;
 mod document_symbols;
 pub use document_symbols::*;
 
+mod notebook;
+pub use notebook::*;
+
 mod file_operations;
 pub use file_operations::*;
 
@@ -238,7 +241,9 @@ pub type LSPArray = Vec<serde_json::Value>;
 
 /// Position in a text document expressed as zero-based line and character offset.
 /// A position is between two characters like an 'insert' cursor in a editor.
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default, Deserialize, Serialize, Hash)]
+#[derive(
+    Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default, Deserialize, Serialize, Hash,
+)]
 pub struct Position {
     /// Line position in a document (zero-based).
     pub line: u32,
@@ -1610,6 +1615,12 @@ pub struct ClientCapabilities {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text_document: Option<TextDocumentClientCapabilities>,
 
+    /// Capabilities specific to the notebook document support.
+    ///
+    /// @since 3.17.0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notebook_document: Option<NotebookDocumentClientCapabilities>,
+
     /// Window specific client capabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowClientCapabilities>,
@@ -1925,6 +1936,13 @@ pub struct ServerCapabilities {
     /// Defines how text documents are synced.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text_document_sync: Option<TextDocumentSyncCapability>,
+
+    /// Defines how notebook documents are synced.
+    ///
+    /// @since 3.17.0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notebook_document_sync:
+        Option<OneOf<NotebookDocumentSyncOptions, NotebookDocumentSyncRegistrationOptions>>,
 
     /// Capabilities specific to `textDocument/selectionRange` requests.
     #[serde(skip_serializing_if = "Option::is_none")]
