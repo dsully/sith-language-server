@@ -137,14 +137,13 @@ fn find_declaration<'a>(
         }
         _ => {
             let symbol_name = identifier_from_node(node_with_parent.node(), offset)?;
-
-            let mut final_path = path;
             let mut declaration = db.symbol_declaration(
                 path,
                 symbol_name,
                 scope,
                 DeclarationQuery::AtOffset(offset),
             )?;
+            let mut final_path = db.indexer().file_path(&declaration.file_id);
 
             // Recursively resolve import chains to find the original symbol declaration.
             // If the symbol isn't found in an import path, assume it refers to a Python module.
