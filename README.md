@@ -44,9 +44,20 @@ An experimental language server for the Python programming language.
 
 ## How to use
 
-You can download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
-build it manually following the steps below. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the `.vsix` file.
+You can install SithLSP from the main branch with
 
+```sh
+$ cargo install --git https://github.com/LaBatata101/sith-language-server
+```
+
+To install a specific release use `--tag`
+
+```sh
+$ cargo install --git https://github.com/LaBatata101/sith-language-server --tag v0.2.2-alpha
+```
+
+You can also download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
+build it manually following the steps below. The VSCode extension can also be downloaded from the [releases](https://github.com/LaBatata101/sith-language-server/releases) page, it's the `.vsix` file.
 
 ### Building the project
 
@@ -88,7 +99,43 @@ $ code --install-extension sith-language-server-*.vsix
 
 ### Neovim Configuration
 
-Add this to your `init.lua` config file.
+If you're using [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) add this to your config
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.sith_lsp then
+  local root_files = {
+    "pyproject.toml",
+    "requirements.txt",
+    "Pipfile",
+    "pyrightconfig.json",
+    ".git",
+  }
+  configs.sith_lsp = {
+    default_config = {
+      cmd = { "/path/to/sith-lsp" },
+      root_dir = function(fname)
+        return lspconfig.util.root_pattern(unpack(root_files))(fname)
+      end,
+      single_file_support = true,
+      filetypes = { "python" },
+      settings = {
+          -- Settings for the server goes here.
+          -- Config example
+          ruff = {
+              lint = {
+                  enable = true
+              }
+          }
+      },
+    },
+  }
+end
+```
+
+Otherwise, add this to your `init.lua` config file.
 
 ```lua
 local pwd = vim.loop.cwd()
