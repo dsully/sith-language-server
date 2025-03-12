@@ -537,7 +537,7 @@ impl Indexer {
                     deferred_paths.extend(python_files.into_iter().map(|path| ImportSource {
                         stub: None,
                         non_stub: Some(Arc::new(path)),
-                        is_thirdparty: true,
+                        is_thirdparty: false,
                     }));
                 }
 
