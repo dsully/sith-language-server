@@ -153,8 +153,9 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         let symbol_type = type_inferer.infer_node(symbol_node, node_stack.nodes());
 
         let current_file_id = self.db.indexer().file_id(self.current_file);
+        let table = self.db.table(self.current_file);
         let references_visitor = ReferencesFinderVisitor::new(
-            self.db.table(self.current_file),
+            table,
             symbol_name,
             &symbol_type,
             type_inferer,
@@ -166,14 +167,11 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
 
         // TODO: find a way to avoid traversing the entire AST if the symbol was defined locally.
         // Check if the symbol was defined locally to a scope and skip global search.
-        let scope_kind = self
-            .db
-            .lookup_symbol(self.current_file, symbol_name, scope_id)
-            .map(|symbol| {
-                self.db
-                    .scope(self.current_file, symbol.definition_scope())
-                    .kind()
-            });
+        let scope_kind = table.lookup_symbol(symbol_name, scope_id).map(|symbol| {
+            self.db
+                .scope(self.current_file, symbol.definition_scope())
+                .kind()
+        });
         if matches!(
             scope_kind,
             Some(ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension)
@@ -183,6 +181,31 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
 
         if matches!(do_global_search, DoGlobalSearch::No) {
             return result;
+        }
+
+        // If the symbol we're trying to find the references for is imported we need to
+        // search for references in the file where it was declared.
+        if let Some(import_source) = table
+            .symbol_declaration(symbol_name, scope_id, DeclarationQuery::First)
+            .and_then(|declaration| declaration.import_source())
+            .filter(|import_source| !import_source.is_unresolved())
+        {
+            let path = import_source.any_path().unwrap();
+            let suite = self.db.indexer().ast_or_panic(path).suite();
+            let node_stack = NodeStack::default().build(suite);
+            let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path.clone());
+            let references_visitor = ReferencesFinderVisitor::new(
+                self.db.table(path),
+                symbol_name,
+                &symbol_type,
+                type_inferer,
+                node_stack.nodes(),
+                include_declaration,
+            );
+            result.insert(
+                self.db.indexer().file_id(path),
+                references_visitor.find_references(suite),
+            );
         }
 
         for (file_id, table) in self
@@ -273,7 +296,8 @@ impl<'a, 'table, 'nodes, 'st> ReferencesFinderVisitor<'a, 'table, 'nodes, 'st> {
         self.curr_scope = self
             .table
             .scope(self.curr_scope)
-            .and_then(|scope| scope.parent())
+            .expect("no current scope")
+            .parent()
             .expect("attempted to pop without parent scope");
         self.type_inferer.set_scope(self.curr_scope);
     }
