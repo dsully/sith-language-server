@@ -189,11 +189,12 @@ impl Declaration {
         )
     }
 
+    pub fn is_instance_parameter(&self) -> bool {
+        matches!(self.kind, DeclarationKind::InstanceParameter(_))
+    }
+
     pub fn is_parameter(&self) -> bool {
-        matches!(
-            self.kind,
-            DeclarationKind::Parameter | DeclarationKind::InstanceParameter(_)
-        )
+        matches!(self.kind, DeclarationKind::InstanceParameter(_))
     }
 
     pub fn import_source(&self) -> Option<&ImportSource> {

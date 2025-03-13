@@ -48,8 +48,11 @@ fn document_symbol(
             let declaration = db.declaration(&document_path, symbol.declarations().first());
             (name, symbol_id, symbol, declaration)
         })
+        .filter(|(name, _, _, _)| name.as_str() != "_")
         // filter out imported symbols and parameters
-        .filter(|(_, _, _, declaration)| !declaration.is_import() && !declaration.is_parameter())
+        .filter(|(_, _, _, declaration)| {
+            !declaration.is_import() && !declaration.is_instance_parameter()
+        })
         .collect::<Vec<_>>();
     filtered_symbols.sort_by_key(|(_, symbol_id, _, _)| **symbol_id);
 
@@ -60,7 +63,9 @@ fn document_symbol(
         .filter(|(_, (_, _, _, declaration))| {
             matches!(
                 declaration.kind,
-                DeclarationKind::Stmt(DeclStmt::Class(_) | DeclStmt::Function(_))
+                DeclarationKind::Stmt(
+                    DeclStmt::Class(_) | DeclStmt::Function(_) | DeclStmt::Method(_, _)
+                )
             )
         })
         .map(|(i, (_, _, _, declaration))| (declaration.body_scope().unwrap(), i))
