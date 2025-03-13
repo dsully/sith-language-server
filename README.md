@@ -53,7 +53,7 @@ $ cargo install --git https://github.com/LaBatata101/sith-language-server
 To install a specific release use `--tag`
 
 ```sh
-$ cargo install --git https://github.com/LaBatata101/sith-language-server --tag v0.2.2-alpha
+$ cargo install --git https://github.com/LaBatata101/sith-language-server --tag v0.2.3-alpha
 ```
 
 You can also download the latest version of SithLSP from the [releases](https://github.com/LaBatata101/sith-language-server/releases) or
