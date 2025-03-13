@@ -4,8 +4,9 @@ use lsp_types::{
 };
 use python_ast_utils::is_class_or_function_deprecated;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 use semantic_model::declaration::{DeclStmt, Declaration, DeclarationKind};
-use semantic_model::{ScopeKind, Symbol};
+use semantic_model::{ScopeId, ScopeKind, Symbol};
 
 use crate::edit::ToRangeExt;
 use crate::server::Result;
@@ -37,10 +38,7 @@ fn document_symbol(
     let db = snapshot.db();
     let node_stack = db.indexer().node_stack(&document_path);
 
-    let mut symbol_nodes = Vec::new();
-    let mut parent_id = None;
-
-    let mut symbols = db
+    let mut filtered_symbols = db
         .scopes(&document_path)
         // filter out symbols created in these scopes
         .filter(|scope| !matches!(scope.kind(), ScopeKind::Comprehension | ScopeKind::Lambda))
@@ -53,33 +51,38 @@ fn document_symbol(
         // filter out imported symbols and parameters
         .filter(|(_, _, _, declaration)| !declaration.is_import() && !declaration.is_parameter())
         .collect::<Vec<_>>();
-    symbols.sort_by_key(|(_, symbol_id, _, _)| **symbol_id);
+    filtered_symbols.sort_by_key(|(_, symbol_id, _, _)| **symbol_id);
 
-    for (i, (name, _, symbol, declaration)) in symbols.into_iter().enumerate() {
-        let node = node_stack.get(declaration.node_id).unwrap();
-        let mut symbol_node = SymbolNode {
-            parent: None,
-            label: name.to_string(),
-            navigation_range: declaration.range,
-            node_range: node.range(),
-            kind: SymbolNode::kind(declaration, symbol),
-            detail: None,
-            deprecated: is_class_or_function_deprecated(node),
-        };
-        if matches!(
-            declaration.kind,
-            DeclarationKind::Stmt(DeclStmt::Class(_) | DeclStmt::Function(_))
-        ) {
-            parent_id = Some(i);
-        }
+    // Map scope IDs defined by class/function symbols to their indices
+    let scope_to_symbol_index: FxHashMap<ScopeId, usize> = filtered_symbols
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, _, _, declaration))| {
+            matches!(
+                declaration.kind,
+                DeclarationKind::Stmt(DeclStmt::Class(_) | DeclStmt::Function(_))
+            )
+        })
+        .map(|(i, (_, _, _, declaration))| (declaration.body_scope().unwrap(), i))
+        .collect();
 
-        let definition_scope = db.scope(&document_path, symbol.definition_scope()).kind();
-        if matches!(definition_scope, ScopeKind::Class | ScopeKind::Function) {
-            symbol_node.parent = parent_id;
-        }
-
-        symbol_nodes.push(symbol_node);
-    }
+    let symbol_nodes: Vec<_> = filtered_symbols
+        .into_iter()
+        .map(|(name, _, symbol, declaration)| {
+            let node = node_stack.get(declaration.node_id).unwrap();
+            SymbolNode {
+                parent: scope_to_symbol_index
+                    .get(&symbol.definition_scope())
+                    .copied(),
+                label: name.to_string(),
+                navigation_range: declaration.range,
+                node_range: node.range(),
+                kind: SymbolNode::kind(declaration, symbol),
+                detail: None,
+                deprecated: is_class_or_function_deprecated(node),
+            }
+        })
+        .collect();
 
     let contents = snapshot.document().contents();
     let index = snapshot.document().index();
