@@ -356,6 +356,7 @@ pub struct Tokens {
 }
 
 impl Tokens {
+    #[allow(dead_code)]
     pub(crate) fn new(tokens: Vec<Token>) -> Tokens {
         Tokens { raw: tokens }
     }
