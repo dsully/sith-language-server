@@ -30,7 +30,7 @@ pub fn node_at_offset<'a>(nodes: &'a Nodes, offset: u32) -> Option<&'a NodeWithP
         .find(|node| node.range().contains_inclusive(offset.into()))
 }
 
-pub fn identifier_from_node<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option<&'a str> {
+pub fn node_identifier_at_offset<'a>(node: &'a AnyNodeRef<'a>, offset: u32) -> Option<&'a str> {
     let offset: TextSize = offset.into();
     Some(match node {
         AnyNodeRef::NameExpr(python_ast::NameExpr { id, .. }) => id,

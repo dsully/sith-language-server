@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lsp_types::{self as types, request as req, Url};
 use python_ast::{AnyNodeRef, Arguments};
 use python_ast_utils::nodes::Nodes;
-use python_ast_utils::{identifier_from_node, node_at_offset};
+use python_ast_utils::{node_at_offset, node_identifier_at_offset};
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use semantic_model::declaration::{Declaration, DeclarationQuery, ImportSource};
@@ -135,7 +135,7 @@ fn find_declaration<'a>(
             (path, declaration)
         }
         _ => {
-            let symbol_name = identifier_from_node(node_with_parent.node(), offset)?;
+            let symbol_name = node_identifier_at_offset(node_with_parent.node(), offset)?;
             let mut declaration = db.symbol_declaration(
                 path,
                 symbol_name,

@@ -6,7 +6,7 @@ use python_ast::{
     AnyNodeRef, Expr, Pattern, Stmt, Suite,
 };
 use python_ast_utils::{
-    identifier_from_node, node_at_offset,
+    node_at_offset, node_identifier_at_offset,
     nodes::{NodeStack, NodeWithParent, Nodes},
 };
 use ruff_source_file::LineIndex;
@@ -64,7 +64,7 @@ fn references(
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;
-    let symbol_name = identifier_from_node(symbol_node, offset)?;
+    let symbol_name = node_identifier_at_offset(symbol_node, offset)?;
 
     let (scope_id, _) = db.find_enclosing_scope(&current_file_path, offset);
 

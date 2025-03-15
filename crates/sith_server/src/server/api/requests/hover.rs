@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lsp_types::{self as types, request as req, HoverContents, MarkupContent, MarkupKind};
 use python_ast::{AnyNodeRef, BoolOp, CmpOp, UnaryOp};
 use python_ast_utils::{
-    identifier_from_node, node_at_offset,
+    node_at_offset, node_identifier_at_offset,
     nodes::{NodeId, NodeStack, NodeWithParent, Nodes},
 };
 use python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
@@ -84,7 +84,7 @@ pub(crate) fn hover(
         return None;
     }
 
-    let identifier = identifier_from_node(node, offset)?;
+    let identifier = node_identifier_at_offset(node, offset)?;
     let mut type_inferer = TypeInferer::new(db, scope_id, document_path);
     let doc_str = match type_inferer.infer_node(node, nodes) {
         ResolvedType::KnownType(PythonType::Class(class_type)) => get_doc_str(

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lsp_types::{self as types, request as req};
-use python_ast_utils::{identifier_from_node, node_at_offset, nodes::NodeStack};
+use python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
 
 use crate::{
     edit::{position_to_offset, ToRangeExt},
@@ -47,7 +47,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentHighlight {
         let Some(symbol_node) = node_at_offset(node_stack.nodes(), offset) else {
             return Ok(None);
         };
-        let Some(symbol_name) = identifier_from_node(symbol_node, offset) else {
+        let Some(symbol_name) = node_identifier_at_offset(symbol_node, offset) else {
             return Ok(None);
         };
         let references = ReferencesFinder::new(db, &current_file).find(

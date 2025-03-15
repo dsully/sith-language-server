@@ -10,7 +10,7 @@ use crate::{
     session::DocumentSnapshot,
 };
 use lsp_types::{self as types, request as req, Url};
-use python_ast_utils::{identifier_from_node, node_at_offset, nodes::NodeStack};
+use python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
 use ruff_source_file::LineIndex;
 use semantic_model::{self as sm, declaration::DeclarationQuery};
 
@@ -50,7 +50,7 @@ fn rename(
     let node_stack = NodeStack::default().build(ast.suite());
 
     let symbol_node = node_at_offset(node_stack.nodes(), offset)?;
-    let symbol_name = identifier_from_node(symbol_node, offset)?;
+    let symbol_name = node_identifier_at_offset(symbol_node, offset)?;
 
     let (scope_id, _) = db.find_enclosing_scope(&current_file_path, offset);
     let references = ReferencesFinder::new(db, &current_file_path).find(
