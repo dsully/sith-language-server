@@ -80,7 +80,11 @@ impl Server {
                 .tracing
                 .log_level
                 .unwrap_or(crate::trace::LogLevel::Info),
-            global_settings.tracing.log_file.as_deref(),
+            global_settings
+                .tracing
+                .log_file
+                .as_deref()
+                .filter(|path| path.is_file()),
             init_params.client_info.as_ref(),
         );
 
