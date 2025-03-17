@@ -493,8 +493,8 @@ fn infer_literal_expr_type(literal: &AnyNodeRef) -> ResolvedType {
         AnyNodeRef::EllipsisLiteralExpr(_) => PythonType::Ellipsis,
         AnyNodeRef::NumberLiteralExpr(python_ast::NumberLiteralExpr { value, .. }) => match value {
             Number::Int(_) => PythonType::Number(NumberLike::Int),
-            Number::Float => PythonType::Number(NumberLike::Float),
-            Number::Complex => PythonType::Number(NumberLike::Complex),
+            Number::Float(_) => PythonType::Number(NumberLike::Float),
+            Number::Complex { .. } => PythonType::Number(NumberLike::Complex),
         },
         _ => unreachable!("expression is not a literal"),
     };

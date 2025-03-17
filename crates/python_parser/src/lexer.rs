@@ -14,7 +14,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
 // use python_ast::name::Name;
-use python_ast::{Int, IpyEscapeKind};
+use python_ast::{Float, Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
@@ -1089,28 +1089,43 @@ impl<'src> Lexer<'src> {
         };
 
         if is_float {
-            // Improvement: Use `Cow` instead of pushing to value text
-            let Ok(_) = f64::from_str(number.as_str()) else {
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::OtherError(
-                        "Invalid decimal literal".to_string().into_boxed_str(),
-                    ),
-                    self.token_range(),
-                ));
+            let value = match Float::from_str(number.as_str()) {
+                Ok(value) => value,
+                Err(err) => {
+                    return self.push_error(LexicalError::new(
+                        LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                        self.token_range(),
+                    ));
+                }
             };
 
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                self.current_value = TokenValue::Complex;
+                self.current_value = TokenValue::Complex {
+                    real: Float::from_f64(0.0),
+                    imag: value,
+                };
                 TokenKind::Complex
             } else {
-                self.current_value = TokenValue::Float;
+                self.current_value = TokenValue::Float(value);
                 TokenKind::Float
             }
         } else {
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                self.current_value = TokenValue::Complex;
+                let imag = match Float::from_str(number.as_str()) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return self.push_error(LexicalError::new(
+                            LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                            self.token_range(),
+                        ));
+                    }
+                };
+                self.current_value = TokenValue::Complex {
+                    real: Float::from_f64(0.0),
+                    imag,
+                };
                 TokenKind::Complex
             } else {
                 let value = match Int::from_str(number.as_str()) {
@@ -1234,7 +1249,7 @@ impl<'src> Lexer<'src> {
                     // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
                     // tokens.
                     if question_count > 2
-                        || value.chars().last().map_or(true, is_python_whitespace)
+                        || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
                         // Not a help end escape command, so continue with the lexing.

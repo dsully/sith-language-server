@@ -519,18 +519,22 @@ impl<'src> Parser<'src> {
 
         let lhs = match self.current_token_kind() {
             TokenKind::Float => {
-                self.bump_value(TokenKind::Float);
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
+                    unreachable!()
+                };
 
                 Expr::NumberLiteral(ast::NumberLiteralExpr {
-                    value: Number::Float,
+                    value: Number::Float(value),
                     range: self.node_range(start),
                 })
             }
             TokenKind::Complex => {
-                self.bump_value(TokenKind::Complex);
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
+                    unreachable!()
+                };
 
                 Expr::NumberLiteral(ast::NumberLiteralExpr {
-                    value: Number::Complex,
+                    value: Number::Complex { real, imag },
                     range: self.node_range(start),
                 })
             }

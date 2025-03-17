@@ -13,7 +13,7 @@ use python_ast::name::Name;
 use python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
-use python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
+use python_ast::{AnyStringFlags, BoolOp, Float, Int, IpyEscapeKind, Operator, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -772,9 +772,9 @@ pub(crate) enum TokenValue {
     /// Token value for an integer.
     Int(Int),
     /// Token value for a floating point number.
-    Float,
+    Float(Float),
     /// Token value for a complex number.
-    Complex,
+    Complex { real: Float, imag: Float },
     /// Token value for a string.
     String(Box<str>),
     /// Token value that includes the portion of text inside the f-string that's not

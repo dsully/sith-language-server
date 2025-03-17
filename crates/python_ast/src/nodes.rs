@@ -1948,8 +1948,11 @@ impl Ranged for NumberLiteralExpr {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, is_macro::Is)]
 pub enum Number {
     Int(int::Int),
-    Float,
-    Complex,
+    Float(float::Float),
+    Complex {
+        real: float::Float,
+        imag: float::Float,
+    },
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

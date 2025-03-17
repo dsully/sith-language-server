@@ -49,7 +49,7 @@ const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
 ])
 .union(LITERAL_PATTERN_START_SET);
 
-impl<'src> Parser<'src> {
+impl Parser<'_> {
     /// Returns `true` if the current token is a valid start of a pattern.
     pub(super) fn at_pattern_start(&self) -> bool {
         self.at_ts(PATTERN_START_SET) || self.at_soft_keyword()
@@ -399,12 +399,14 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Complex => {
-                self.bump_value(TokenKind::Complex);
+                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
+                    unreachable!()
+                };
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(Expr::NumberLiteral(ast::NumberLiteralExpr {
-                        value: Number::Complex,
+                        value: Number::Complex { real, imag },
                         range,
                     })),
                     range,
@@ -425,12 +427,14 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::Float => {
-                self.bump_value(TokenKind::Float);
+                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
+                    unreachable!()
+                };
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(Expr::NumberLiteral(ast::NumberLiteralExpr {
-                        value: Number::Float,
+                        value: Number::Float(value),
                         range,
                     })),
                     range,
@@ -723,7 +727,7 @@ impl AllowStarPattern {
 const fn is_real_number(expr: &Expr) -> bool {
     match expr {
         Expr::NumberLiteral(ast::NumberLiteralExpr {
-            value: ast::Number::Int(_) | ast::Number::Float,
+            value: ast::Number::Int(_) | ast::Number::Float(_),
             ..
         }) => true,
         Expr::UnaryOp(ast::UnaryOpExpr {
