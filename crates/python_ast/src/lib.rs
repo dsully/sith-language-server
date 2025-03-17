@@ -1,9 +1,11 @@
 use std::path::Path;
 
+pub use float::*;
 pub use int::*;
 pub use node::{AnyNode, AnyNodeRef, AstNode, NodeKind};
 pub use nodes::*;
 
+mod float;
 mod int;
 pub mod name;
 mod node;
