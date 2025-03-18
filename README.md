@@ -35,6 +35,7 @@ An experimental language server for the Python programming language.
 - textDocument/hover
 - textDocument/documentSymbol
 - textDocument/codeAction
+- textDocument/signatureHelp
 - workspace/executeCommand
 - workspace/didChangeWorkspaceFolders
 - completionItem/resolve

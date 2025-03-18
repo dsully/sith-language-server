@@ -11,6 +11,7 @@ mod hover;
 mod prepare_rename;
 mod references;
 mod rename;
+mod signature_help;
 
 use super::{
     define_document_url,
@@ -30,5 +31,6 @@ pub(super) use hover::Hover;
 pub(super) use prepare_rename::PrepareRename;
 pub(super) use references::References;
 pub(super) use rename::Rename;
+pub(super) use signature_help::SignatureHelp;
 
 type FormatResponse = Option<Vec<lsp_types::TextEdit>>;

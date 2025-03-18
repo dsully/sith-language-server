@@ -11,6 +11,7 @@ use lsp_types::CodeActionKind;
 use lsp_types::CodeActionOptions;
 use lsp_types::CompletionOptions;
 use lsp_types::HoverProviderCapability;
+use lsp_types::SignatureHelpOptions;
 use types::ClientCapabilities;
 use types::DiagnosticOptions;
 use types::DidChangeWatchedFilesRegistrationOptions;
@@ -315,6 +316,13 @@ impl Server {
                 },
             }),
             document_symbol_provider: Some(OneOf::Left(true)),
+            signature_help_provider: Some(SignatureHelpOptions {
+                trigger_characters: Some(vec!["(".to_owned(), ",".to_owned()]),
+                retrigger_characters: None,
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            }),
             ..Default::default()
         }
     }

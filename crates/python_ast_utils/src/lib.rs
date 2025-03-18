@@ -201,6 +201,24 @@ fn is_deprecated_annotation(node: &Expr) -> bool {
     }
 }
 
+pub fn is_function_overloaded(node: &AnyNodeRef) -> bool {
+    match node {
+        AnyNodeRef::StmtFunctionDef(FunctionDefStmt { decorator_list, .. }) => decorator_list
+            .iter()
+            .any(|decorator| is_overload_annotation(&decorator.expression)),
+        _ => false,
+    }
+}
+
+fn is_overload_annotation(node: &Expr) -> bool {
+    match node {
+        Expr::Name(NameExpr { id, .. }) if id == "overload" => true,
+        Expr::Attribute(AttributeExpr { attr, .. }) if attr == "overload" => true,
+        Expr::Call(CallExpr { func, .. }) => is_deprecated_annotation(func),
+        _ => false,
+    }
+}
+
 pub fn expr_to_str(expr: &Expr) -> String {
     let mut result = String::new();
     match expr {

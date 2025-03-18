@@ -305,4 +305,11 @@ impl SymbolDeclarations {
             SymbolDeclarationsInner::Multiple(ids) => ids.push(id),
         }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &DeclId> {
+        match &self.inner {
+            SymbolDeclarationsInner::Single(decl_id) => std::slice::from_ref(decl_id).iter(),
+            SymbolDeclarationsInner::Multiple(decl_ids) => decl_ids.iter(),
+        }
+    }
 }

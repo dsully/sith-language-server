@@ -78,6 +78,9 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         request::DocumentSymbol::METHOD => {
             background_request_task::<request::DocumentSymbol>(req, BackgroundSchedule::Worker)
         }
+        request::SignatureHelp::METHOD => {
+            background_request_task::<request::SignatureHelp>(req, BackgroundSchedule::Worker)
+        }
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();
