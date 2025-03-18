@@ -12,9 +12,9 @@ use std::slice::{Iter, IterMut};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::int;
 use crate::name::Name;
 use crate::str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
+use crate::{float, int};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -1515,6 +1515,44 @@ impl StringLiteralValue {
             StringLiteralValueInner::Concatenated(value) => value.to_str(),
         }
     }
+
+    /// Returns the prefix used in the string literal.
+    ///
+    /// For implicit concatenated strings this function takes the prefix
+    /// of the first string.
+    pub fn prefix(&self) -> StringLiteralPrefix {
+        match &self.inner {
+            StringLiteralValueInner::Single(string_literal) => string_literal.flags.prefix(),
+            StringLiteralValueInner::Concatenated(concatenated_string_literal) => {
+                concatenated_string_literal
+                    .strings
+                    .first()
+                    .map(|string| string.flags.prefix())
+                    .unwrap()
+            }
+        }
+    }
+
+    /// Return `true` if the string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `"""bar"""`
+    ///
+    /// For implicit concatenated strings this function checks if the
+    /// first string is triple quoted.
+    pub fn is_triple_quoted(&self) -> bool {
+        match &self.inner {
+            StringLiteralValueInner::Single(string_literal) => {
+                string_literal.flags.is_triple_quoted()
+            }
+            StringLiteralValueInner::Concatenated(concatenated_string_literal) => {
+                concatenated_string_literal
+                    .strings
+                    .first()
+                    .map(|string| string.flags.is_triple_quoted())
+                    .unwrap()
+            }
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a StringLiteralValue {
@@ -1750,8 +1788,38 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
+    }
+
+    /// Returns the prefix used in the bytes literal.
+    ///
+    /// For implicit concatenated bytes strings this function takes the prefix
+    /// of the first byte string.
+    pub fn prefix(&self) -> ByteStringPrefix {
+        match &self.inner {
+            BytesLiteralValueInner::Single(bytes_literal) => bytes_literal.flags.prefix(),
+            BytesLiteralValueInner::Concatenated(bytes_literals) => bytes_literals
+                .first()
+                .map(|bytes_literal| bytes_literal.flags.prefix())
+                .unwrap(),
+        }
+    }
+
+    /// Return `true` if the bytestring is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `b"""{bar}"""`
+    ///
+    /// For implicit concatenated bytes strings this function checks if the
+    /// first byte string is triple quoted.
+    pub fn is_triple_quoted(&self) -> bool {
+        match &self.inner {
+            BytesLiteralValueInner::Single(bytes_literal) => bytes_literal.flags.is_triple_quoted(),
+            BytesLiteralValueInner::Concatenated(bytes_literals) => bytes_literals
+                .first()
+                .map(|bytes_literal| bytes_literal.flags.is_triple_quoted())
+                .unwrap(),
+        }
     }
 }
 

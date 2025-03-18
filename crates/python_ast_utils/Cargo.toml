@@ -10,3 +10,6 @@ ruff_index = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_python_resolver = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+python_parser = { workspace = true }
