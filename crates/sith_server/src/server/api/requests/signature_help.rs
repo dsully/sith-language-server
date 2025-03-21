@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use compact_str::CompactString;
 use lsp_types::{self as types, request as req, Url};
-use python_ast::AnyNodeRef;
+use python_ast::{AnyNodeRef, AnyParameterRef};
 use python_ast_utils::nodes::{NodeWithParent, Nodes};
 use python_ast_utils::{call_expr_identifier, expr_to_str, is_function_overloaded, node_at_offset};
 use python_utils::nodes::get_documentation_string_from_node;
@@ -158,7 +158,15 @@ impl From<&python_ast::FunctionDefStmt> for FunctionSignature {
             params: func_stmt
                 .parameters
                 .iter()
-                .map(|param| CompactString::new(param.name()))
+                .map(|param| match param {
+                    AnyParameterRef::KwArgs(param) => {
+                        CompactString::new(format!("**{}", param.name))
+                    }
+                    AnyParameterRef::VarArgs(param) => {
+                        CompactString::new(format!("*{}", param.name))
+                    }
+                    _ => CompactString::new(param.name()),
+                })
                 .collect(),
             return_type: func_stmt
                 .returns

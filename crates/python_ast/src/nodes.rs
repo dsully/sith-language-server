@@ -3084,12 +3084,20 @@ pub struct Decorator {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AnyParameterRef<'a> {
     /// Variadic parameters cannot have default values,
-    /// e.g. both `*args` and `**kwargs` in the following function:
+    /// e.g.`**kwargs` in the following function:
     ///
     /// ```python
-    /// def foo(*args, **kwargs): pass
+    /// def foo(**kwargs): pass
     /// ```
-    Variadic(&'a Parameter),
+    KwArgs(&'a Parameter),
+
+    /// Variadic parameters cannot have default values,
+    /// e.g. `*args` in the following function:
+    ///
+    /// ```python
+    /// def foo(*args): pass
+    /// ```
+    VarArgs(&'a Parameter),
 
     /// Non-variadic parameters can have default values,
     /// though they won't necessarily always have them:
@@ -3104,13 +3112,13 @@ impl<'a> AnyParameterRef<'a> {
     pub const fn as_parameter(self) -> &'a Parameter {
         match self {
             Self::NonVariadic(param) => &param.parameter,
-            Self::Variadic(param) => param,
+            Self::KwArgs(param) | Self::VarArgs(param) => param,
         }
     }
 
     pub fn as_variadic(self) -> Option<&'a Parameter> {
         match self {
-            Self::Variadic(param) => Some(param),
+            Self::KwArgs(param) | Self::VarArgs(param) => Some(param),
             Self::NonVariadic(_) => None,
         }
     }
@@ -3120,7 +3128,7 @@ impl<'a> AnyParameterRef<'a> {
     }
 
     pub const fn is_variadic(self) -> bool {
-        matches!(self, Self::Variadic(_))
+        matches!(self, Self::KwArgs(_))
     }
 
     pub fn annotation(self) -> Option<&'a Expr> {
@@ -3130,7 +3138,7 @@ impl<'a> AnyParameterRef<'a> {
     pub fn default(self) -> Option<&'a Expr> {
         match self {
             Self::NonVariadic(param) => param.default.as_deref(),
-            Self::Variadic(_) => None,
+            Self::KwArgs(_) | Self::VarArgs(_) => None,
         }
     }
 }
@@ -3139,7 +3147,7 @@ impl Ranged for AnyParameterRef<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::NonVariadic(param) => param.range,
-            Self::Variadic(param) => param.range,
+            Self::KwArgs(param) | Self::VarArgs(param) => param.range,
         }
     }
 }
@@ -3296,12 +3304,12 @@ impl<'a> Iterator for ParametersIterator<'a> {
             return Some(AnyParameterRef::NonVariadic(param));
         }
         if let Some(param) = vararg.take() {
-            return Some(AnyParameterRef::Variadic(param));
+            return Some(AnyParameterRef::VarArgs(param));
         }
         if let Some(param) = kwonlyargs.next() {
             return Some(AnyParameterRef::NonVariadic(param));
         }
-        kwarg.take().map(AnyParameterRef::Variadic)
+        kwarg.take().map(AnyParameterRef::KwArgs)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -3350,13 +3358,13 @@ impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
         } = self;
 
         if let Some(param) = kwarg.take() {
-            return Some(AnyParameterRef::Variadic(param));
+            return Some(AnyParameterRef::KwArgs(param));
         }
         if let Some(param) = kwonlyargs.next_back() {
             return Some(AnyParameterRef::NonVariadic(param));
         }
         if let Some(param) = vararg.take() {
-            return Some(AnyParameterRef::Variadic(param));
+            return Some(AnyParameterRef::KwArgs(param));
         }
         if let Some(param) = args.next_back() {
             return Some(AnyParameterRef::NonVariadic(param));
