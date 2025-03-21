@@ -2,6 +2,7 @@ pub mod nodes;
 
 use std::borrow::Borrow;
 
+use compact_str::CompactString;
 use nodes::{NodeWithParent, Nodes};
 use python_ast::{
     str_prefix::FStringPrefix,
@@ -537,14 +538,14 @@ pub fn expr_to_str(expr: &Expr) -> String {
 }
 
 fn parameters_to_str(parameters: &Parameters) -> String {
-    let mut parts: Vec<String> = Vec::new();
+    let mut parts: Vec<CompactString> = Vec::new();
 
     // 1. Positional-only parameters
     for arg in &parameters.posonlyargs {
         parts.push(parameter_with_default_to_str(arg));
     }
     if !parameters.posonlyargs.is_empty() {
-        parts.push("/".to_string());
+        parts.push(CompactString::new("/"));
     }
 
     // 2. Regular parameters
@@ -554,9 +555,9 @@ fn parameters_to_str(parameters: &Parameters) -> String {
 
     // 3. Variable positional argument or lone asterisk
     if let Some(vararg) = &parameters.vararg {
-        parts.push(format!("*{}", vararg.name));
+        parts.push(CompactString::new(format!("*{}", vararg.name)));
     } else if !parameters.kwonlyargs.is_empty() {
-        parts.push("*".to_string());
+        parts.push(CompactString::new("*"));
     }
 
     // 4. Keyword-only parameters
@@ -566,17 +567,17 @@ fn parameters_to_str(parameters: &Parameters) -> String {
 
     // 5. Variable keyword argument
     if let Some(kwarg) = &parameters.kwarg {
-        parts.push(format!("**{}", kwarg.name));
+        parts.push(CompactString::new(format!("**{}", kwarg.name)));
     }
 
     parts.join(", ")
 }
 
-fn parameter_with_default_to_str(param: &ParameterWithDefault) -> String {
-    let mut result = String::new();
+pub fn parameter_with_default_to_str(param: &ParameterWithDefault) -> CompactString {
+    let mut result = CompactString::default();
     result.push_str(&param.parameter.name);
     if let Some(default) = &param.default {
-        result.push('=');
+        result.push_str(" = ");
         result.push_str(&expr_to_str(default));
     }
     result
