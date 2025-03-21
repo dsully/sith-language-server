@@ -165,7 +165,17 @@ impl From<&python_ast::FunctionDefStmt> for FunctionSignature {
                     AnyParameterRef::VarArgs(param) => {
                         CompactString::new(format!("*{}", param.name))
                     }
-                    _ => CompactString::new(param.name()),
+                    AnyParameterRef::NonVariadic(param) => {
+                        if let Some(default) = &param.default {
+                            CompactString::new(format!(
+                                "{} = {}",
+                                param.parameter.name,
+                                expr_to_str(default)
+                            ))
+                        } else {
+                            CompactString::new(&param.parameter.name)
+                        }
+                    }
                 })
                 .collect(),
             return_type: func_stmt
