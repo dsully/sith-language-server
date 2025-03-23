@@ -197,6 +197,10 @@ impl Declaration {
         matches!(self.kind, DeclarationKind::InstanceParameter(_))
     }
 
+    pub fn is_method(&self) -> bool {
+        matches!(self.kind, DeclarationKind::Stmt(DeclStmt::Method(_, _)))
+    }
+
     pub fn import_source(&self) -> Option<&ImportSource> {
         match &self.kind {
             DeclarationKind::Stmt(

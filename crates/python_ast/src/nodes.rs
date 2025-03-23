@@ -880,14 +880,14 @@ impl<'a> Iterator for DictKeyIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+impl DoubleEndedIterator for DictKeyIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::key)
     }
 }
 
-impl<'a> FusedIterator for DictKeyIterator<'a> {}
-impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+impl FusedIterator for DictKeyIterator<'_> {}
+impl ExactSizeIterator for DictKeyIterator<'_> {}
 
 #[derive(Debug, Clone)]
 pub struct DictValueIterator<'a> {
@@ -922,14 +922,14 @@ impl<'a> Iterator for DictValueIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+impl DoubleEndedIterator for DictValueIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.items.next_back().map(DictItem::value)
     }
 }
 
-impl<'a> FusedIterator for DictValueIterator<'a> {}
-impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
+impl FusedIterator for DictValueIterator<'_> {}
+impl ExactSizeIterator for DictValueIterator<'_> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -3105,13 +3105,15 @@ pub enum AnyParameterRef<'a> {
     /// ```python
     /// def bar(a=1, /, b=2, *, c=3): pass
     /// ```
-    NonVariadic(&'a ParameterWithDefault),
+    Param(&'a ParameterWithDefault),
+    PosOnly(&'a ParameterWithDefault),
+    KwOnly(&'a ParameterWithDefault),
 }
 
 impl<'a> AnyParameterRef<'a> {
     pub const fn as_parameter(self) -> &'a Parameter {
         match self {
-            Self::NonVariadic(param) => &param.parameter,
+            Self::Param(param) | Self::PosOnly(param) | Self::KwOnly(param) => &param.parameter,
             Self::KwArgs(param) | Self::VarArgs(param) => param,
         }
     }
@@ -3119,7 +3121,7 @@ impl<'a> AnyParameterRef<'a> {
     pub fn as_variadic(self) -> Option<&'a Parameter> {
         match self {
             Self::KwArgs(param) | Self::VarArgs(param) => Some(param),
-            Self::NonVariadic(_) => None,
+            _ => None,
         }
     }
 
@@ -3137,7 +3139,9 @@ impl<'a> AnyParameterRef<'a> {
 
     pub fn default(self) -> Option<&'a Expr> {
         match self {
-            Self::NonVariadic(param) => param.default.as_deref(),
+            Self::Param(param) | Self::KwOnly(param) | Self::PosOnly(param) => {
+                param.default.as_deref()
+            }
             Self::KwArgs(_) | Self::VarArgs(_) => None,
         }
     }
@@ -3146,7 +3150,7 @@ impl<'a> AnyParameterRef<'a> {
 impl Ranged for AnyParameterRef<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::NonVariadic(param) => param.range,
+            Self::Param(param) | Self::KwOnly(param) | Self::PosOnly(param) => param.range,
             Self::KwArgs(param) | Self::VarArgs(param) => param.range,
         }
     }
@@ -3185,12 +3189,37 @@ impl Parameters {
     }
 
     /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
-        self.posonlyargs
+    pub fn find(&self, name: &str) -> Option<(usize, &ParameterWithDefault)> {
+        if let Some((i, param)) = self
+            .posonlyargs
             .iter()
-            .chain(&self.args)
-            .chain(&self.kwonlyargs)
-            .find(|arg| arg.parameter.name.as_str() == name)
+            .enumerate()
+            .find(|(_, param)| param.parameter.name.as_str() == name)
+        {
+            return Some((i, param));
+        }
+
+        let offset = self.posonlyargs.len();
+        if let Some((i, param)) = self
+            .args
+            .iter()
+            .enumerate()
+            .find(|(_, param)| param.parameter.name.as_str() == name)
+        {
+            return Some((offset + i, param));
+        }
+
+        let offset = self.posonlyargs.len() + self.args.len() + usize::from(self.vararg.is_some());
+        if let Some((i, param)) = self
+            .kwonlyargs
+            .iter()
+            .enumerate()
+            .find(|(_, param)| param.parameter.name.as_str() == name)
+        {
+            return Some((offset + i, param));
+        }
+
+        None
     }
 
     /// Returns `true` if a parameter with the given name included in this [`Parameters`].
@@ -3298,16 +3327,16 @@ impl<'a> Iterator for ParametersIterator<'a> {
         } = self;
 
         if let Some(param) = posonlyargs.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
+            return Some(AnyParameterRef::PosOnly(param));
         }
         if let Some(param) = args.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
+            return Some(AnyParameterRef::Param(param));
         }
         if let Some(param) = vararg.take() {
             return Some(AnyParameterRef::VarArgs(param));
         }
         if let Some(param) = kwonlyargs.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
+            return Some(AnyParameterRef::KwOnly(param));
         }
         kwarg.take().map(AnyParameterRef::KwArgs)
     }
@@ -3347,7 +3376,7 @@ impl<'a> Iterator for ParametersIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+impl DoubleEndedIterator for ParametersIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let ParametersIterator {
             posonlyargs,
@@ -3361,23 +3390,23 @@ impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
             return Some(AnyParameterRef::KwArgs(param));
         }
         if let Some(param) = kwonlyargs.next_back() {
-            return Some(AnyParameterRef::NonVariadic(param));
+            return Some(AnyParameterRef::KwOnly(param));
         }
         if let Some(param) = vararg.take() {
-            return Some(AnyParameterRef::KwArgs(param));
+            return Some(AnyParameterRef::VarArgs(param));
         }
         if let Some(param) = args.next_back() {
-            return Some(AnyParameterRef::NonVariadic(param));
+            return Some(AnyParameterRef::Param(param));
         }
-        posonlyargs.next_back().map(AnyParameterRef::NonVariadic)
+        posonlyargs.next_back().map(AnyParameterRef::PosOnly)
     }
 }
 
-impl<'a> FusedIterator for ParametersIterator<'a> {}
+impl FusedIterator for ParametersIterator<'_> {}
 
 /// We rely on the same invariants outlined in the comment above `Parameters::len()`
 /// in order to implement `ExactSizeIterator` here
-impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
+impl ExactSizeIterator for ParametersIterator<'_> {}
 
 impl<'a> IntoIterator for &'a Parameters {
     type IntoIter = ParametersIterator<'a>;
