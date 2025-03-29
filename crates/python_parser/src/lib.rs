@@ -234,6 +234,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Parsed<T> {
     syntax: T,
+    tokens: Tokens,
     errors: Vec<ParseError>,
 }
 
@@ -241,6 +242,11 @@ impl<T> Parsed<T> {
     /// Returns the syntax node represented by this parsed output.
     pub fn syntax(&self) -> &T {
         &self.syntax
+    }
+
+    /// Returns all the tokens for the parsed output.
+    pub fn tokens(&self) -> &Tokens {
+        &self.tokens
     }
 
     /// Returns a list of syntax errors found during parsing.
@@ -296,6 +302,7 @@ impl Parsed<Mod> {
         match self.syntax {
             Mod::Module(module) => Some(Parsed {
                 syntax: module,
+                tokens: self.tokens,
                 errors: self.errors,
             }),
             Mod::Expression(_) => None,
@@ -314,6 +321,7 @@ impl Parsed<Mod> {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
                 syntax: expression,
+                tokens: self.tokens,
                 errors: self.errors,
             }),
         }
@@ -350,7 +358,7 @@ impl Parsed<ModExpression> {
 }
 
 /// Tokens represents a vector of lexed [`Token`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Tokens {
     raw: Vec<Token>,
 }

@@ -10,8 +10,8 @@ use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::Parsed;
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{Parsed, Tokens};
 
 mod expression;
 mod helpers;
@@ -147,7 +147,7 @@ impl<'src> Parser<'src> {
 
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
-        let (_, lex_errors) = self.tokens.finish();
+        let (tokens, lex_errors) = self.tokens.finish();
 
         // Fast path for when there are no lex errors.
         // There's no fast path for when there are no parse errors because a lex error
@@ -155,6 +155,7 @@ impl<'src> Parser<'src> {
         if lex_errors.is_empty() {
             return Parsed {
                 syntax,
+                tokens: Tokens::new(tokens),
                 errors: parse_errors,
             };
         }
@@ -185,6 +186,7 @@ impl<'src> Parser<'src> {
 
         Parsed {
             syntax,
+            tokens: Tokens::new(tokens),
             errors: merged,
         }
     }
