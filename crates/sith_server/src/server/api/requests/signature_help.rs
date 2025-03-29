@@ -58,7 +58,8 @@ fn signature_help(
     let symbol_type = type_inferer.infer_expr(call_expr.func.as_ref(), node_stack.nodes());
     let (file_id, symbol_id) = match symbol_type {
         ResolvedType::KnownType(PythonType::Class(class_type)) => {
-            (class_type.file_id, class_type.symbol_id)
+            let (constructor_symbol_id, _) = class_type.lookup(db, "__init__")?;
+            (class_type.file_id, constructor_symbol_id)
         }
         ResolvedType::KnownType(PythonType::Function {
             file_id, symbol_id, ..
