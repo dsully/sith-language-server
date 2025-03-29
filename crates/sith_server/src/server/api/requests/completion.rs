@@ -376,9 +376,12 @@ fn get_call_expr_position_ctx<'nodes>(
     let mut type_inferer = TypeInferer::new(db, scope_id, path.clone());
     match type_inferer.infer_expr(func, nodes) {
         ResolvedType::KnownType(PythonType::Class(class)) => {
-            let Some(declaration) = class.constructor(db) else {
+            let Some((_, symbol)) = class.lookup(db, "__init__") else {
                 return PositionCtx::Module;
             };
+            let class_file = db.indexer().file_path(&class.file_id);
+            // TODO: handle multiple constructors
+            let declaration = db.declaration(class_file, symbol.declarations().first());
             PositionCtx::Call {
                 file_id: class.file_id,
                 node_id: declaration.node_id,

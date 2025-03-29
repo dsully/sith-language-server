@@ -16,7 +16,7 @@ use crate::{
     declaration::{Declaration, DeclarationKind, DeclarationQuery, ImportSource},
     mro::compute_mro,
     symbol::SymbolId,
-    ScopeId,
+    ScopeId, Symbol,
 };
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -283,15 +283,13 @@ impl ClassType {
             .any(|base_class| is_cyclically_defined_recursive(db, base_class, &mut IndexSet::new()))
     }
 
-    pub fn constructor<'db>(&self, db: &'db SymbolTableDb) -> Option<&'db Declaration> {
+    pub fn lookup<'db>(
+        &self,
+        db: &'db SymbolTableDb,
+        symbol: &str,
+    ) -> Option<(SymbolId, &'db Symbol)> {
         let file_path = db.indexer().file_path(&self.file_id);
-        // TODO: handle multiple constructors
-        db.symbol_declaration(
-            file_path,
-            "__init__",
-            self.body_scope,
-            DeclarationQuery::First,
-        )
+        db.lookup_symbol(file_path, symbol, self.body_scope)
     }
 }
 
