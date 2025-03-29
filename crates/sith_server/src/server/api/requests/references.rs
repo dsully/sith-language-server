@@ -168,11 +168,13 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
 
         // TODO: find a way to avoid traversing the entire AST if the symbol was defined locally.
         // Check if the symbol was defined locally to a scope and skip global search.
-        let scope_kind = table.lookup_symbol(symbol_name, scope_id).map(|symbol| {
-            self.db
-                .scope(self.current_file, symbol.definition_scope())
-                .kind()
-        });
+        let scope_kind = table
+            .lookup_symbol(symbol_name, scope_id)
+            .map(|(_, symbol)| {
+                self.db
+                    .scope(self.current_file, symbol.definition_scope())
+                    .kind()
+            });
         if matches!(
             scope_kind,
             Some(ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension)

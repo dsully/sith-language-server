@@ -61,10 +61,10 @@ impl SymbolTable {
         self.decls.iter()
     }
 
-    pub fn lookup_symbol(&self, name: &str, scope: ScopeId) -> Option<&Symbol> {
+    pub fn lookup_symbol(&self, name: &str, scope: ScopeId) -> Option<(SymbolId, &Symbol)> {
         let scope = self.scopes.get(scope).unwrap();
         if let Some(symbol_id) = scope.symbol_id(name) {
-            return self.symbol(symbol_id);
+            return self.symbol(symbol_id).map(|s| (symbol_id, s));
         }
 
         // If the symbol is not found in the given `scope` search in the enclosing scopes until it
@@ -73,7 +73,7 @@ impl SymbolTable {
         self.scopes
             .ancestors(parent_id)
             .find_map(|scope| scope.symbol_id(name))
-            .and_then(|symbol_id| self.symbol(symbol_id))
+            .and_then(|symbol_id| self.symbol(symbol_id).map(|s| (symbol_id, s)))
     }
 
     pub fn find_enclosing_scope(&self, offset: u32) -> (ScopeId, &Scope) {
@@ -89,7 +89,7 @@ impl SymbolTable {
         scope_id: ScopeId,
         query: DeclarationQuery,
     ) -> Option<&Declaration> {
-        self.lookup_symbol(name, scope_id).and_then(|symbol| {
+        self.lookup_symbol(name, scope_id).and_then(|(_, symbol)| {
             let mut declaration = match query {
                 DeclarationQuery::Last => self.declaration(symbol.declarations().last()),
                 DeclarationQuery::First => self.declaration(symbol.declarations().first()),
@@ -946,7 +946,7 @@ where
                         | VisitorFlags::IN_CLASS
                         | VisitorFlags::IN_FUNCTION,
                 ) {
-                    if let Some(symbol) = self.table.lookup_symbol(id, self.curr_scope) {
+                    if let Some((_, symbol)) = self.table.lookup_symbol(id, self.curr_scope) {
                         let declaration = self
                             .table
                             .declaration(symbol.declarations().last())
