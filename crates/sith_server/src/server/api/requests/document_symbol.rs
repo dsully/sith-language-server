@@ -2,11 +2,11 @@ use lsp_types::{
     self as types, request as req, DocumentSymbolResponse, Location, SymbolInformation, SymbolKind,
     SymbolTag, Url,
 };
-use python_ast_utils::is_class_or_function_deprecated;
+use sith_python_ast_utils::is_class_or_function_deprecated;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
-use semantic_model::declaration::{DeclStmt, Declaration, DeclarationKind};
-use semantic_model::{ScopeId, ScopeKind, Symbol};
+use sith_semantic_model::declaration::{DeclStmt, Declaration, DeclarationKind};
+use sith_semantic_model::{ScopeId, ScopeKind, Symbol};
 
 use crate::edit::ToRangeExt;
 use crate::server::Result;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, ClientInfo, Url};
-use semantic_model::db::Source;
+use sith_semantic_model::db::Source;
 use settings::ResolvedClientSettings;
 pub(crate) use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
 

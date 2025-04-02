@@ -7,14 +7,14 @@ edition = "2021"
 [lib]
 
 [dependencies]
-python_ast = { workspace = true }
-python_parser = { workspace = true }
+sith_python_ast = { workspace = true }
+sith_python_parser = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
-semantic_model = { workspace = true }
+sith_semantic_model = { workspace = true }
 ruff_python_resolver = { workspace = true }
-python_ast_utils  = { workspace = true }
-python_utils = { workspace = true }
+sith_python_ast_utils  = { workspace = true }
+sith_python_utils = { workspace = true }
 
 compact_str = { workspace = true }
 anyhow = { workspace = true }

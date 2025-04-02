@@ -2,16 +2,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use lsp_types::{self as types, request as req, Url};
-use python_ast::{AnyNodeRef, Arguments};
-use python_ast_utils::nodes::Nodes;
-use python_ast_utils::{node_at_offset, node_identifier_at_offset};
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
-use semantic_model::declaration::{Declaration, DeclarationQuery, ImportSource};
-use semantic_model::type_inference::TypeInferer;
-use semantic_model::type_inference::{PythonType, ResolvedType};
-use semantic_model::ScopeId;
-use semantic_model::{self as sm, db::SymbolTableDb};
+use sith_python_ast::{self as ast, AnyNodeRef, Arguments};
+use sith_python_ast_utils::nodes::Nodes;
+use sith_python_ast_utils::{node_at_offset, node_identifier_at_offset};
+use sith_semantic_model::declaration::{Declaration, DeclarationQuery, ImportSource};
+use sith_semantic_model::type_inference::TypeInferer;
+use sith_semantic_model::type_inference::{PythonType, ResolvedType};
+use sith_semantic_model::ScopeId;
+use sith_semantic_model::{self as sm, db::SymbolTableDb};
 use types::GotoDefinitionResponse;
 
 use crate::edit::{position_to_offset, ToLocation};
@@ -85,7 +85,7 @@ fn find_declaration<'a>(
     let mut is_python_module = IsPythonModule::No;
 
     let (path, declaration) = match node_with_parent.node() {
-        AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, attr, .. }) => {
+        AnyNodeRef::AttributeExpr(ast::AttributeExpr { value, attr, .. }) => {
             let mut type_inferer = TypeInferer::new(db, scope, path.clone());
             let (path, scope) = match type_inferer.infer_expr(value.as_ref(), nodes) {
                 ResolvedType::KnownType(PythonType::Class(class)) => {
@@ -102,7 +102,7 @@ fn find_declaration<'a>(
             (path, declaration)
         }
         // find the declaration of an argument in a call expression
-        AnyNodeRef::CallExpr(python_ast::CallExpr {
+        AnyNodeRef::CallExpr(ast::CallExpr {
             func,
             arguments: Arguments { keywords, .. },
             ..

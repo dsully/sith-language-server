@@ -979,77 +979,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "python_ast"
-version = "0.1.0"
-dependencies = [
- "bitflags 2.9.0",
- "compact_str",
- "is-macro",
- "itertools",
- "ruff_source_file",
- "ruff_text_size",
- "static_assertions",
-]
-
-[[package]]
-name = "python_ast_utils"
-version = "0.1.0"
-dependencies = [
- "compact_str",
- "python_ast",
- "python_parser",
- "ruff_index",
- "ruff_python_resolver",
- "ruff_source_file",
- "ruff_text_size",
- "serde",
-]
-
-[[package]]
-name = "python_parser"
-version = "0.0.0"
-dependencies = [
- "annotate-snippets",
- "anyhow",
- "bitflags 2.9.0",
- "bstr",
- "compact_str",
- "insta",
- "is-macro",
- "itertools",
- "memchr",
- "python_ast",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash",
- "static_assertions",
- "unicode-ident",
- "unicode-normalization",
- "unicode_names2",
- "walkdir",
-]
-
-[[package]]
-name = "python_utils"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "dirs 6.0.0",
- "python_ast",
- "rayon",
- "regex",
- "ruff_python_resolver",
- "rustc-hash",
- "serde",
- "serde_json",
- "sha2",
- "toml",
- "tracing",
- "walkdir",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1279,35 +1208,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "semantic_model"
-version = "0.1.0"
-dependencies = [
- "bimap",
- "bitflags 2.9.0",
- "compact_str",
- "directories",
- "ignore",
- "indexmap",
- "insta",
- "itertools",
- "log",
- "path-slash",
- "python_ast",
- "python_ast_utils",
- "python_parser",
- "python_utils",
- "rayon",
- "ruff_index",
- "ruff_python_resolver",
- "ruff_text_size",
- "rustc-hash",
- "serde",
- "tracing",
- "walkdir",
- "zip",
-]
-
-[[package]]
 name = "serde"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1433,15 +1333,115 @@ dependencies = [
  "anyhow",
  "insta",
  "pretty_assertions",
- "python_ast",
- "python_parser",
  "ruff_python_resolver",
  "serde",
  "serde_json",
+ "sith_python_ast",
+ "sith_python_parser",
  "sith_server",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
+]
+
+[[package]]
+name = "sith_python_ast"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.0",
+ "compact_str",
+ "is-macro",
+ "itertools",
+ "ruff_source_file",
+ "ruff_text_size",
+ "static_assertions",
+]
+
+[[package]]
+name = "sith_python_ast_utils"
+version = "0.1.0"
+dependencies = [
+ "compact_str",
+ "ruff_index",
+ "ruff_python_resolver",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde",
+ "sith_python_ast",
+ "sith_python_parser",
+]
+
+[[package]]
+name = "sith_python_parser"
+version = "0.0.0"
+dependencies = [
+ "annotate-snippets",
+ "anyhow",
+ "bitflags 2.9.0",
+ "bstr",
+ "compact_str",
+ "insta",
+ "is-macro",
+ "itertools",
+ "memchr",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash",
+ "sith_python_ast",
+ "static_assertions",
+ "unicode-ident",
+ "unicode-normalization",
+ "unicode_names2",
+ "walkdir",
+]
+
+[[package]]
+name = "sith_python_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "dirs 6.0.0",
+ "rayon",
+ "regex",
+ "ruff_python_resolver",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sith_python_ast",
+ "toml",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "sith_semantic_model"
+version = "0.1.0"
+dependencies = [
+ "bimap",
+ "bitflags 2.9.0",
+ "compact_str",
+ "directories",
+ "ignore",
+ "indexmap",
+ "insta",
+ "itertools",
+ "log",
+ "path-slash",
+ "rayon",
+ "ruff_index",
+ "ruff_python_resolver",
+ "ruff_text_size",
+ "rustc-hash",
+ "serde",
+ "sith_python_ast",
+ "sith_python_ast_utils",
+ "sith_python_parser",
+ "sith_python_utils",
+ "tracing",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]
@@ -1456,18 +1456,18 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
- "python_ast",
- "python_ast_utils",
- "python_parser",
- "python_utils",
  "ruff_python_resolver",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "semantic_model",
  "serde",
  "serde_json",
  "shellexpand",
+ "sith_python_ast",
+ "sith_python_ast_utils",
+ "sith_python_parser",
+ "sith_python_utils",
+ "sith_semantic_model",
  "tracing",
  "tracing-subscriber",
 ]

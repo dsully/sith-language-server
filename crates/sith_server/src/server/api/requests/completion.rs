@@ -10,16 +10,17 @@ use lsp_types::{
     request::{self as req},
     CompletionItem, CompletionItemKind,
 };
-use python_ast::{AnyNodeRef, Expr};
-use python_ast_utils::{
-    node_at_offset, node_at_row,
-    nodes::{NodeId, Nodes},
-};
-use python_utils::get_python_module_names_in_path;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
-use semantic_model::{
+use serde::{Deserialize, Serialize};
+use sith_python_ast::{self as ast, AnyNodeRef, Expr};
+use sith_python_ast_utils::{
+    node_at_offset, node_at_row,
+    nodes::{NodeId, Nodes},
+};
+use sith_python_utils::get_python_module_names_in_path;
+use sith_semantic_model::{
     builtins::BUILTIN_KEYWORDS,
     db::{FileId, SymbolTableDb},
     declaration::{DeclId, DeclStmt, DeclarationKind, DeclarationQuery},
@@ -27,7 +28,6 @@ use semantic_model::{
     type_inference::{PythonType, ResolvedType, TypeInferer},
     Scope, ScopeId, ScopeKind, Symbol,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     edit::position_to_offset,
@@ -226,7 +226,7 @@ fn position_context<'nodes>(
     };
 
     match node.node() {
-        AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. }) => {
+        AnyNodeRef::StmtClassDef(ast::ClassDefStmt { name, .. }) => {
             let Some(declaration) = db.symbol_declaration(
                 path,
                 name,
@@ -238,7 +238,7 @@ fn position_context<'nodes>(
 
             PositionCtx::Class(declaration.body_scope().unwrap())
         }
-        AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. }) => {
+        AnyNodeRef::StmtFunctionDef(ast::FunctionDefStmt { name, .. }) => {
             let Some(declaration) = db.symbol_declaration(
                 path,
                 name,
@@ -250,7 +250,7 @@ fn position_context<'nodes>(
 
             PositionCtx::Function(declaration.body_scope().unwrap())
         }
-        AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { value, .. }) => {
+        AnyNodeRef::AttributeExpr(ast::AttributeExpr { value, .. }) => {
             let (scope_id, _) = db.find_enclosing_scope(path, offset);
             PositionCtx::AttrAccess(value, scope_id)
         }
@@ -258,7 +258,7 @@ fn position_context<'nodes>(
             has_segments: false,
             prev_segments: vec![],
         },
-        AnyNodeRef::Alias(python_ast::Alias { name, .. }) => {
+        AnyNodeRef::Alias(ast::Alias { name, .. }) => {
             let Some(parent_node) = node.parent_id().and_then(|id| nodes.get(id)) else {
                 unreachable!()
             };
@@ -283,12 +283,12 @@ fn position_context<'nodes>(
                         prev_segments,
                     }
                 }
-                AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
-                    level, module, ..
-                }) => PositionCtx::ImportFromName {
-                    level: *level,
-                    last_segment: module.as_ref().and_then(|module| module.split(".").last()),
-                },
+                AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { level, module, .. }) => {
+                    PositionCtx::ImportFromName {
+                        level: *level,
+                        last_segment: module.as_ref().and_then(|module| module.split(".").last()),
+                    }
+                }
                 _ => unreachable!(),
             }
         }
@@ -300,7 +300,7 @@ fn position_context<'nodes>(
         // - level: counts the number of dots in relative imports (e.g., `from .. import` has level 2)
         // - module length: length of the module path if present (e.g., "foo" or "foo.bar")
         // - 10: combined length of "from" (4) + "import" (6) keywords `.
-        AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt { module, level, .. })
+        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { module, level, .. })
             if offset as usize
                 > *level as usize + module.as_ref().map(|m| m.len()).unwrap_or(0) + 10 =>
         {
@@ -309,7 +309,7 @@ fn position_context<'nodes>(
                 last_segment: module.as_ref().and_then(|module| module.split(".").last()),
             }
         }
-        AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt { module, level, .. }) => {
+        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { module, level, .. }) => {
             let mut prev_segments = Vec::new();
             if let Some(module) = module {
                 let module_start = module.range.start().to_usize();
@@ -327,7 +327,7 @@ fn position_context<'nodes>(
                 prev_segments,
             }
         }
-        AnyNodeRef::Parameters(python_ast::Parameters { args, .. })
+        AnyNodeRef::Parameters(ast::Parameters { args, .. })
             if args
                 .iter()
                 .any(|pwd| is_in_type_param_annotation(offset, &pwd.parameter)) =>
@@ -350,7 +350,7 @@ fn position_context<'nodes>(
                 _ => PositionCtx::Module,
             }
         }
-        AnyNodeRef::CallExpr(python_ast::CallExpr { func, .. }) => {
+        AnyNodeRef::CallExpr(ast::CallExpr { func, .. }) => {
             get_call_expr_position_ctx(func, db, path, scope_id, nodes)
         }
         _ => PositionCtx::Module,
@@ -362,7 +362,7 @@ fn position_context<'nodes>(
 /// `:` character. The second part is to avoid returning `TypeParamAnnotation`
 /// when the text cursor is the parameter name. The `Parameter` range will be
 /// bigger because of the `:` character.
-fn is_in_type_param_annotation(offset: u32, param: &python_ast::Parameter) -> bool {
+fn is_in_type_param_annotation(offset: u32, param: &ast::Parameter) -> bool {
     offset > param.name.range.end().to_u32() + 1 && param.name.range().end() < param.range.end()
 }
 

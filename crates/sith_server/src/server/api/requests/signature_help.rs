@@ -2,15 +2,17 @@ use std::sync::Arc;
 
 use compact_str::CompactString;
 use lsp_types::{self as types, request as req, Url};
-use python_ast::{AnyNodeRef, AnyParameterRef, ArgOrKeyword, Arguments, CallExpr, Parameters};
-use python_ast_utils::nodes::{NodeWithParent, Nodes};
-use python_ast_utils::{
+use ruff_text_size::{Ranged, TextSize};
+use sith_python_ast::{
+    self as ast, AnyNodeRef, AnyParameterRef, ArgOrKeyword, Arguments, CallExpr, Parameters,
+};
+use sith_python_ast_utils::nodes::{NodeWithParent, Nodes};
+use sith_python_ast_utils::{
     expr_to_str, is_function_overloaded, node_at_offset, parameter_with_default_to_str,
 };
-use python_utils::nodes::get_documentation_string_from_node;
-use ruff_text_size::{Ranged, TextSize};
-use semantic_model::declaration::Declaration;
-use semantic_model::type_inference::{PythonType, ResolvedType, TypeInferer};
+use sith_python_utils::nodes::get_documentation_string_from_node;
+use sith_semantic_model::declaration::Declaration;
+use sith_semantic_model::type_inference::{PythonType, ResolvedType, TypeInferer};
 
 use crate::edit::position_to_offset;
 use crate::server::api::Result;
@@ -143,7 +145,7 @@ fn get_call_expr_at_offset_in_arguments<'a>(
     offset: u32,
     node: &'a NodeWithParent,
     nodes: &'a Nodes,
-) -> Option<&'a python_ast::CallExpr> {
+) -> Option<&'a ast::CallExpr> {
     let mut node = node;
     // If the node is not a call expression, walk through it's parents until it has no parent
     // or it is a call expression.
@@ -154,7 +156,7 @@ fn get_call_expr_at_offset_in_arguments<'a>(
             .unwrap();
     }
 
-    matches!(node.node(), AnyNodeRef::CallExpr(python_ast::CallExpr { arguments, .. })
+    matches!(node.node(), AnyNodeRef::CallExpr(ast::CallExpr { arguments, .. })
         if arguments.range.contains(offset.into()))
     .then(|| node.node().as_call_expr())
     .flatten()
@@ -366,7 +368,7 @@ struct FunctionSignature {
 }
 
 impl FunctionSignature {
-    fn from_function(func_stmt: &python_ast::FunctionDefStmt) -> Self {
+    fn from_function(func_stmt: &ast::FunctionDefStmt) -> Self {
         Self {
             name: CompactString::new(func_stmt.name.as_str()),
             docs: get_documentation_string_from_node(&AnyNodeRef::StmtFunctionDef(func_stmt)),

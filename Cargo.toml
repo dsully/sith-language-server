@@ -13,8 +13,8 @@ license = "MIT"
 members = ["crates/*"]
 
 [dependencies]
-python_ast = { workspace = true }
-python_parser = { workspace = true }
+sith_python_ast = { workspace = true }
+sith_python_parser = { workspace = true }
 ruff_python_resolver = { workspace = true }
 sith_server = { workspace = true }
 tracing = { workspace = true }
@@ -28,13 +28,13 @@ serde_json = { workspace = true }
 ruff_text_size = { path = "crates/ruff_text_size", package = "ruff_text_size" }
 ruff_index = { path = "crates/ruff_index", package = "ruff_index" }
 ruff_source_file = { path = "crates/ruff_source_file", package = "ruff_source_file" }
-python_ast = { path = "crates/python_ast", package = "python_ast" }
-python_parser = { path = "crates/python_parser", package = "python_parser" }
+sith_python_ast = { path = "crates/sith_python_ast", package = "sith_python_ast" }
+sith_python_parser = { path = "crates/sith_python_parser", package = "sith_python_parser" }
 sith_server = { path = "crates/sith_server", package = "sith_server" }
-semantic_model = { path = "crates/semantic_model", package = "semantic_model" }
+sith_semantic_model = { path = "crates/sith_semantic_model", package = "sith_semantic_model" }
 ruff_python_resolver = { path = "crates/ruff_python_resolver", package = "ruff_python_resolver" }
-python_ast_utils = { path = "crates/python_ast_utils", package = "python_ast_utils" }
-python_utils = { path = "crates/python_utils", package = "python_utils" }
+sith_python_ast_utils = { path = "crates/sith_python_ast_utils", package = "sith_python_ast_utils" }
+sith_python_utils = { path = "crates/sith_python_utils", package = "sith_python_utils" }
 lsp-types = { path = "crates/lsp-types", features = ["proposed"] }
 
 bitflags = "2.4.1"

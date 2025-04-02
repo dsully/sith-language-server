@@ -5,7 +5,7 @@ use crate::server::Result;
 use crate::session::Session;
 use lsp_types as types;
 use lsp_types::notification as notif;
-use semantic_model::db::Source;
+use sith_semantic_model::db::Source;
 
 pub(crate) struct DidChange;
 

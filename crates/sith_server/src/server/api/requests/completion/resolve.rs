@@ -4,10 +4,10 @@ use lsp_types::{
     request::{self as req},
     CompletionItem, Documentation, MarkupContent, Url,
 };
-use python_ast_utils::nodes::NodeStack;
-use python_parser::parse_module;
-use python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
-use semantic_model::{self as sm, db::SymbolTableDb, declaration::DeclarationQuery, ScopeId};
+use sith_python_ast_utils::nodes::NodeStack;
+use sith_python_parser::parse_module;
+use sith_python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
+use sith_semantic_model::{self as sm, db::SymbolTableDb, declaration::DeclarationQuery, ScopeId};
 
 use crate::server::Result;
 use crate::{

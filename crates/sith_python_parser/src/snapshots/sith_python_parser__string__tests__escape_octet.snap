@@ -1,0 +1,34 @@
+---
+source: crates/sith_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        ExprStmt {
+            range: 0..14,
+            value: BytesLiteral(
+                BytesLiteralExpr {
+                    range: 0..14,
+                    value: BytesLiteralValue {
+                        inner: Single(
+                            BytesLiteral {
+                                range: 0..14,
+                                value: [
+                                    35,
+                                    97,
+                                    4,
+                                    83,
+                                    52,
+                                ],
+                                flags: BytesLiteralFlags {
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

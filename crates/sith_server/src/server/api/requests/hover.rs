@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use lsp_types::{self as types, request as req, HoverContents, MarkupContent, MarkupKind};
-use python_ast::{AnyNodeRef, BoolOp, CmpOp, UnaryOp};
-use python_ast_utils::{
+use ruff_text_size::{Ranged, TextRange, TextSize};
+use sith_python_ast::{self as ast, AnyNodeRef, BoolOp, CmpOp, UnaryOp};
+use sith_python_ast_utils::{
     node_at_offset, node_identifier_at_offset,
     nodes::{NodeId, NodeStack, NodeWithParent, Nodes},
 };
-use python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
-use ruff_text_size::{Ranged, TextRange, TextSize};
-use semantic_model::{
+use sith_python_utils::{get_python_doc, nodes::get_documentation_string_from_node};
+use sith_semantic_model::{
     self as sm,
     db::{FileId, SymbolTableDb},
     declaration::DeclarationQuery,
@@ -230,7 +230,7 @@ impl HoverPosition<'_> {
             {
                 Self::Id
             }
-            AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+            AnyNodeRef::StmtImportFrom(ast::ImportFromStmt {
                 module: Some(module),
                 names,
                 ..
@@ -277,7 +277,7 @@ impl HoverPosition<'_> {
                 }
             }
             AnyNodeRef::NoneLiteralExpr(_) => Self::Keyword("None"),
-            AnyNodeRef::BoolOpExpr(python_ast::BoolOpExpr {
+            AnyNodeRef::BoolOpExpr(ast::BoolOpExpr {
                 op: BoolOp::Or,
                 values,
                 ..
@@ -287,7 +287,7 @@ impl HoverPosition<'_> {
             {
                 Self::Keyword("or")
             }
-            AnyNodeRef::BoolOpExpr(python_ast::BoolOpExpr {
+            AnyNodeRef::BoolOpExpr(ast::BoolOpExpr {
                 op: BoolOp::And,
                 values,
                 ..
@@ -297,7 +297,7 @@ impl HoverPosition<'_> {
             {
                 Self::Keyword("and")
             }
-            AnyNodeRef::UnaryOpExpr(python_ast::UnaryOpExpr {
+            AnyNodeRef::UnaryOpExpr(ast::UnaryOpExpr {
                 op: UnaryOp::Not, ..
             }) if keyword_range(node.range().start(), "not").contains(offset) => {
                 Self::Keyword("not")
@@ -359,7 +359,7 @@ impl HoverPosition<'_> {
                 }
                 Self::Other
             }
-            AnyNodeRef::IfExpr(python_ast::IfExpr { body, test, .. }) => {
+            AnyNodeRef::IfExpr(ast::IfExpr { body, test, .. }) => {
                 let if_range = keyword_range(body.range().add_end(1.into()).end(), "if");
                 let else_range = keyword_range(test.range().add_end(1.into()).end(), "else");
                 if if_range.contains(offset) {
@@ -370,7 +370,7 @@ impl HoverPosition<'_> {
                     Self::Other
                 }
             }
-            AnyNodeRef::StmtIf(python_ast::IfStmt {
+            AnyNodeRef::StmtIf(ast::IfStmt {
                 elif_else_clauses, ..
             }) => {
                 // Here we are only checking for the "else" keyword but that's fine since "else"
@@ -387,7 +387,7 @@ impl HoverPosition<'_> {
                     Self::Other
                 }
             }
-            AnyNodeRef::StmtTry(python_ast::TryStmt {
+            AnyNodeRef::StmtTry(ast::TryStmt {
                 handlers,
                 finalbody,
                 ..
@@ -431,7 +431,7 @@ impl HoverPosition<'_> {
             {
                 Self::Keyword("import")
             }
-            AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+            AnyNodeRef::StmtImportFrom(ast::ImportFromStmt {
                 module: Some(module),
                 ..
             }) if keyword_range(module.range.add_end(1.into()).end(), "import")
@@ -458,7 +458,7 @@ impl HoverPosition<'_> {
                 }
                 Self::Other
             }
-            AnyNodeRef::StmtMatch(python_ast::MatchStmt { cases, .. }) => {
+            AnyNodeRef::StmtMatch(ast::MatchStmt { cases, .. }) => {
                 if keyword_range(node.range().start(), "match").contains(offset) {
                     Self::Keyword("match")
                 } else if cases
@@ -475,7 +475,7 @@ impl HoverPosition<'_> {
             {
                 Self::Keyword("type")
             }
-            AnyNodeRef::CompareExpr(python_ast::CompareExpr {
+            AnyNodeRef::CompareExpr(ast::CompareExpr {
                 ops,
                 left,
                 comparators,

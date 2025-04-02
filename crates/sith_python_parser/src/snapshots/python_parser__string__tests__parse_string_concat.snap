@@ -1,0 +1,41 @@
+---
+source: crates/sith_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        ExprStmt {
+            range: 0..16,
+            value: StringLiteral(
+                StringLiteralExpr {
+                    range: 0..16,
+                    value: StringLiteralValue {
+                        inner: Concatenated(
+                            ConcatenatedStringLiteral {
+                                strings: [
+                                    StringLiteral {
+                                        range: 0..8,
+                                        value: "Hello ",
+                                        flags: StringLiteralFlags {
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                    StringLiteral {
+                                        range: 9..16,
+                                        value: "world",
+                                        flags: StringLiteralFlags {
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ],
+                                value: "Hello world",
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

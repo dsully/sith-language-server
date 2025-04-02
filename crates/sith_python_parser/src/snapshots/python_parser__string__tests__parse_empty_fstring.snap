@@ -1,0 +1,30 @@
+---
+source: crates/sith_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        ExprStmt {
+            range: 0..3,
+            value: FString(
+                FStringExpr {
+                    range: 0..3,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..3,
+                                    elements: [],
+                                    flags: FStringFlags {
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

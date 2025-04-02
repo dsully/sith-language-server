@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lsp_types::{self as types, request as req};
-use python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
+use sith_python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
 
 use crate::{
     edit::{position_to_offset, ToRangeExt},

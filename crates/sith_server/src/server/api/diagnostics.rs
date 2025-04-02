@@ -5,7 +5,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, TextEdit, Url,
 };
-use semantic_model::declaration::{DeclStmt, DeclarationKind};
+use sith_semantic_model::declaration::{DeclStmt, DeclarationKind};
 use serde::{Deserialize, Serialize};
 
 use crate::{

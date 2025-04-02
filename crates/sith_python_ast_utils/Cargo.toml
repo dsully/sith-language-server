@@ -1,0 +1,16 @@
+[package]
+name = "sith_python_ast_utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sith_python_ast = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_index = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_python_resolver = { workspace = true }
+serde = { workspace = true }
+compact_str = { workspace = true }
+
+[dev-dependencies]
+sith_python_parser = { workspace = true }

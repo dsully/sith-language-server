@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Context};
 use lsp_types::Url;
-use python_utils::interpreter::resolve_python_interpreter;
-use python_utils::{find_python_project_root, PythonHost};
+use sith_python_utils::interpreter::resolve_python_interpreter;
+use sith_python_utils::{find_python_project_root, PythonHost};
 use rustc_hash::FxHashMap;
-use semantic_model::db::{Source, SymbolTableDb};
+use sith_semantic_model::db::{Source, SymbolTableDb};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::PathBuf;

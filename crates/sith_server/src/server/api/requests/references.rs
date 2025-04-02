@@ -1,18 +1,19 @@
 use std::{path::PathBuf, sync::Arc};
 
 use lsp_types::{self as types, request as req, Url};
-use python_ast::{
-    visitor::{self, Visitor},
-    AnyNodeRef, Expr, Pattern, Stmt, Suite,
-};
-use python_ast_utils::{
-    node_at_offset, node_identifier_at_offset,
-    nodes::{NodeStack, NodeWithParent, Nodes},
-};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
-use semantic_model::{
+use sith_python_ast::{
+    self as ast,
+    visitor::{self, Visitor},
+    AnyNodeRef, Expr, Pattern, Stmt, Suite,
+};
+use sith_python_ast_utils::{
+    node_at_offset, node_identifier_at_offset,
+    nodes::{NodeStack, NodeWithParent, Nodes},
+};
+use sith_semantic_model::{
     self as sm,
     db::{FileId, SymbolTableDb},
     declaration::DeclarationQuery,
@@ -310,9 +311,9 @@ impl<'a, 'b> Visitor<'b> for ReferencesFinderVisitor<'a, '_, '_, '_>
 where
     'b: 'a,
 {
-    fn visit_stmt(&mut self, stmt: &'b python_ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'b ast::Stmt) {
         match stmt {
-            Stmt::FunctionDef(python_ast::FunctionDefStmt {
+            Stmt::FunctionDef(ast::FunctionDefStmt {
                 name,
                 body,
                 parameters,
@@ -346,7 +347,7 @@ where
                 self.visit_body(body);
                 self.pop_scope();
             }
-            Stmt::ClassDef(python_ast::ClassDefStmt {
+            Stmt::ClassDef(ast::ClassDefStmt {
                 name,
                 body,
                 decorator_list,
@@ -383,9 +384,9 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b python_ast::Expr) {
+    fn visit_expr(&mut self, expr: &'b ast::Expr) {
         match expr {
-            Expr::Name(python_ast::NameExpr { id, ctx, range }) if id == self.symbol_name => {
+            Expr::Name(ast::NameExpr { id, ctx, range }) if id == self.symbol_name => {
                 if ctx.is_store() && self.include_declaration.no() {
                     return;
                 }
@@ -394,7 +395,7 @@ where
                     self.references.push(*range);
                 }
             }
-            Expr::Attribute(python_ast::AttributeExpr {
+            Expr::Attribute(ast::AttributeExpr {
                 value, attr, ctx, ..
             }) => {
                 self.visit_expr(value);
@@ -407,7 +408,7 @@ where
                     self.references.push(attr.range);
                 }
             }
-            Expr::Lambda(python_ast::LambdaExpr {
+            Expr::Lambda(ast::LambdaExpr {
                 parameters, body, ..
             }) => {
                 self.visit_next_scope();
@@ -417,13 +418,13 @@ where
                 self.visit_expr(body);
                 self.pop_scope();
             }
-            Expr::ListComp(python_ast::ListCompExpr {
+            Expr::ListComp(ast::ListCompExpr {
                 elt, generators, ..
             })
-            | Expr::SetComp(python_ast::SetCompExpr {
+            | Expr::SetComp(ast::SetCompExpr {
                 elt, generators, ..
             })
-            | Expr::Generator(python_ast::GeneratorExpr {
+            | Expr::Generator(ast::GeneratorExpr {
                 elt, generators, ..
             }) => {
                 self.visit_next_scope();
@@ -433,7 +434,7 @@ where
                 self.visit_expr(elt);
                 self.pop_scope();
             }
-            Expr::DictComp(python_ast::DictCompExpr {
+            Expr::DictComp(ast::DictCompExpr {
                 key,
                 value,
                 generators,
@@ -451,7 +452,7 @@ where
         }
     }
 
-    fn visit_alias(&mut self, alias: &'b python_ast::Alias) {
+    fn visit_alias(&mut self, alias: &'b ast::Alias) {
         if self.include_declaration.no() {
             return;
         }
@@ -477,7 +478,7 @@ where
         }
     }
 
-    fn visit_parameter(&mut self, parameter: &'b python_ast::Parameter) {
+    fn visit_parameter(&mut self, parameter: &'b ast::Parameter) {
         if self.include_declaration.yes()
             && parameter.name.as_str() == self.symbol_name
             && self.symbol_type
@@ -491,8 +492,8 @@ where
         }
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'b python_ast::ExceptHandler) {
-        let python_ast::ExceptHandler::ExceptHandler(python_ast::ExceptHandlerExceptHandler {
+    fn visit_except_handler(&mut self, except_handler: &'b ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
             name,
             body,
@@ -516,9 +517,9 @@ where
         self.visit_body(body);
     }
 
-    fn visit_pattern(&mut self, pattern: &'b python_ast::Pattern) {
+    fn visit_pattern(&mut self, pattern: &'b ast::Pattern) {
         match pattern {
-            Pattern::MatchAs(python_ast::PatternMatchAs { name, pattern, .. }) => {
+            Pattern::MatchAs(ast::PatternMatchAs { name, pattern, .. }) => {
                 if let Some(pattern) = pattern {
                     self.visit_pattern(pattern);
                 }
@@ -535,7 +536,7 @@ where
                     }
                 }
             }
-            Pattern::MatchSequence(python_ast::PatternMatchSequence { patterns, .. }) => {
+            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
                 }

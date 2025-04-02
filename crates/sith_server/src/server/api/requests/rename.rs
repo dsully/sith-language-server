@@ -10,9 +10,9 @@ use crate::{
     session::DocumentSnapshot,
 };
 use lsp_types::{self as types, request as req, Url};
-use python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
+use sith_python_ast_utils::{node_at_offset, node_identifier_at_offset, nodes::NodeStack};
 use ruff_source_file::LineIndex;
-use semantic_model::{self as sm, declaration::DeclarationQuery};
+use sith_semantic_model::{self as sm, declaration::DeclarationQuery};
 
 pub(crate) struct Rename;
 

@@ -1,7 +1,7 @@
 use lsp_types::{self as types, request as req};
-use python_ast::AnyNodeRef;
-use python_ast_utils::node_at_offset;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use sith_python_ast::{self as ast, AnyNodeRef};
+use sith_python_ast_utils::node_at_offset;
 
 use crate::{
     edit::{position_to_offset, ToRangeExt},
@@ -52,26 +52,26 @@ fn prepare_rename(
 fn is_node_valid_for_rename(node: &AnyNodeRef, offset: TextSize) -> Option<TextRange> {
     Some(match node {
         AnyNodeRef::NameExpr(_) | AnyNodeRef::Alias(_) | AnyNodeRef::Parameter(_) => node.range(),
-        AnyNodeRef::StmtFunctionDef(python_ast::FunctionDefStmt { name, .. })
-        | AnyNodeRef::StmtClassDef(python_ast::ClassDefStmt { name, .. })
+        AnyNodeRef::StmtFunctionDef(ast::FunctionDefStmt { name, .. })
+        | AnyNodeRef::StmtClassDef(ast::ClassDefStmt { name, .. })
             if name.range().contains_inclusive(offset) =>
         {
             name.range()
         }
-        AnyNodeRef::StmtImportFrom(python_ast::ImportFromStmt {
+        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt {
             module: Some(module),
             ..
         }) if module.range().contains_inclusive(offset) => module.range(),
-        AnyNodeRef::AttributeExpr(python_ast::AttributeExpr { attr, .. })
+        AnyNodeRef::AttributeExpr(ast::AttributeExpr { attr, .. })
             if attr.range().contains_inclusive(offset) =>
         {
             attr.range()
         }
-        AnyNodeRef::ExceptHandlerExceptHandler(python_ast::ExceptHandlerExceptHandler {
+        AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             name: Some(name),
             ..
         }) if name.range().contains_inclusive(offset) => name.range(),
-        AnyNodeRef::CallExpr(python_ast::CallExpr { arguments, .. }) => {
+        AnyNodeRef::CallExpr(ast::CallExpr { arguments, .. }) => {
             return arguments.keywords.iter().find_map(|keyword| {
                 if let Some(arg) = &keyword.arg {
                     arg.range().contains_inclusive(offset).then(|| arg.range())
@@ -80,12 +80,12 @@ fn is_node_valid_for_rename(node: &AnyNodeRef, offset: TextSize) -> Option<TextR
                 }
             });
         }
-        AnyNodeRef::PatternKeyword(python_ast::PatternKeyword { attr, .. })
+        AnyNodeRef::PatternKeyword(ast::PatternKeyword { attr, .. })
             if attr.range().contains_inclusive(offset) =>
         {
             attr.range()
         }
-        AnyNodeRef::PatternMatchAs(python_ast::PatternMatchAs {
+        AnyNodeRef::PatternMatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         }) if name.range().contains_inclusive(offset) => name.range(),
         _ => return None,
