@@ -14,7 +14,7 @@ use crate::util::{convert_url_to_path, is_url_unnamed};
 use crate::Document;
 
 use super::settings::ResolvedClientSettings;
-use super::ClientSettings;
+use super::{ClientEditor, ClientSettings};
 
 #[derive(Default)]
 pub(crate) struct Workspaces {
@@ -222,7 +222,13 @@ impl Workspaces {
         Ok(())
     }
 
-    pub(super) fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
+    pub(super) fn open(
+        &mut self,
+        url: &Url,
+        contents: String,
+        version: DocumentVersion,
+        client_editor: ClientEditor,
+    ) {
         if let Some(workspace) = self.workspace_for_url_mut(url) {
             let db = workspace.symbol_table_db.make_mut();
 
@@ -230,7 +236,10 @@ impl Workspaces {
                 show_warn_msg!("You are currently editing an in-memory file, some LSP features may not work properly!");
             }
 
-            if url.path() == "/" && workspace.open_documents.contains(url) {
+            if is_url_unnamed(url)
+                && client_editor.is_neovim()
+                && workspace.open_documents.contains(url)
+            {
                 tracing::error!("Tried to open multiple Neovim unnamed buffers!");
                 show_err_msg!("SithLSP doesn't support multiple Neovim unnamed buffers!");
             } else {

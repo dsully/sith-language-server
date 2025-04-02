@@ -27,6 +27,7 @@ use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
 use crate::session::AllSettings;
+use crate::session::ClientEditor;
 use crate::session::ClientSettings;
 use crate::session::Session;
 use crate::PositionEncoding;
@@ -89,6 +90,8 @@ impl Server {
             init_params.client_info.as_ref(),
         );
 
+        let client_editor = ClientEditor::from_client_info(init_params.client_info);
+
         let mut workspace_for_url = |url: lsp_types::Url| {
             let Some(workspace_settings) = workspace_settings.as_mut() else {
                 return (url, ClientSettings::default());
@@ -122,6 +125,7 @@ impl Server {
                 &client_capabilities,
                 position_encoding,
                 global_settings,
+                client_editor,
                 workspaces,
             )?,
             client_capabilities,

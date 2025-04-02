@@ -7,7 +7,7 @@ mod workspace;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use lsp_types::{ClientCapabilities, Url};
+use lsp_types::{ClientCapabilities, ClientInfo, Url};
 use semantic_model::db::Source;
 use settings::ResolvedClientSettings;
 pub(crate) use workspace::{DocumentController, DocumentRef, SymbolTableDbRef, Workspaces};
@@ -29,6 +29,29 @@ pub(crate) struct Session {
     global_settings: ClientSettings,
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    /// Identifies the type of text editor connected to the server.
+    client_editor: ClientEditor,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ClientEditor {
+    Neovim,
+    VSCode,
+    Other,
+}
+
+impl ClientEditor {
+    pub(crate) fn from_client_info(client_info: Option<ClientInfo>) -> Self {
+        match client_info.as_ref().map(|c| c.name.as_str()) {
+            Some("Neovim") => Self::Neovim,
+            Some("Visual Studio Code") => Self::VSCode,
+            _ => Self::Other,
+        }
+    }
+
+    pub(crate) fn is_neovim(self) -> bool {
+        matches!(self, ClientEditor::Neovim)
+    }
 }
 
 /// An immutable snapshot of `Session` that references
@@ -47,6 +70,7 @@ impl Session {
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
+        client_editor: ClientEditor,
         workspaces: Vec<(Url, ClientSettings)>,
     ) -> crate::Result<Self> {
         Ok(Self {
@@ -55,6 +79,7 @@ impl Session {
                 client_capabilities,
             )),
             workspaces: Workspaces::new(workspaces, global_settings.clone())?,
+            client_editor,
             global_settings,
         })
     }
@@ -72,7 +97,8 @@ impl Session {
     }
 
     pub(crate) fn open_document(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        self.workspaces.open(url, contents, version);
+        self.workspaces
+            .open(url, contents, version, self.client_editor);
     }
 
     pub(crate) fn close_document(&mut self, url: &Url) -> crate::Result<()> {
