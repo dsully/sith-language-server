@@ -18,6 +18,10 @@ harness = false
 name = "lexer"
 harness = false
 
+[[bench]]
+name = "semantic_table_builder"
+harness = false
+
 [dependencies]
 url = "2.5.0"
 ureq = "2.9.6"
