@@ -7,10 +7,6 @@ use std::{
 };
 
 use bimap::BiHashMap;
-use sith_python_ast::{ModModule, Suite};
-use sith_python_ast_utils::nodes::NodeStack;
-use sith_python_parser::{parse_module, Parsed};
-use sith_python_utils::{PythonHost, ROOT_FILES};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_index::{newtype_index, Idx};
 use ruff_python_resolver::{
@@ -18,6 +14,10 @@ use ruff_python_resolver::{
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use serde::{Deserialize, Serialize};
+use sith_python_ast::{ModModule, Suite};
+use sith_python_ast_utils::nodes::NodeStack;
+use sith_python_parser::{parse_module, Parsed};
+use sith_python_utils::{PythonHost, ROOT_FILES};
 use walkdir::WalkDir;
 
 use crate::{
@@ -321,7 +321,11 @@ impl Indexer {
                 .into_par_iter()
                 .filter_map(|(file_id, is_thirdparty)| {
                     let path = self.file_path(&file_id);
-                    if path.is_file() && path.extension().is_some_and(|ext| ext != "so") {
+                    if path.is_file()
+                        && path
+                            .extension()
+                            .is_some_and(|ext| ext != "so" && ext != "pyd")
+                    {
                         let contents = util::read_to_string(path.as_path())
                             .map_err(|err| {
                                 tracing::error!("Failed to read `{}`: {err}", path.display());
