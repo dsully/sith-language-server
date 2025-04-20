@@ -63,6 +63,8 @@ enum PositionCtx<'node> {
         file_id: FileId,
         node_id: NodeId,
     },
+    String,
+    FString,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -347,11 +349,16 @@ fn position_context<'nodes>(
                 AnyNodeRef::Parameter(param) if is_in_type_param_annotation(offset, param) => {
                     PositionCtx::TypeParamAnnotation(scope_id)
                 }
+                AnyNodeRef::FStringExpressionElement(_) => PositionCtx::FString,
                 _ => PositionCtx::Module,
             }
         }
         AnyNodeRef::CallExpr(ast::CallExpr { func, .. }) => {
             get_call_expr_position_ctx(func, db, path, scope_id, nodes)
+        }
+        AnyNodeRef::FStringExpressionElement(_) => PositionCtx::FString,
+        AnyNodeRef::StringLiteralExpr(_) | AnyNodeRef::FStringLiteralElement(_) => {
+            PositionCtx::String
         }
         _ => PositionCtx::Module,
     }
@@ -539,6 +546,10 @@ fn get_completion_candidates(
 ) -> Option<Vec<CompletionItem>> {
     let mut completion_candidates = FxHashSet::default();
 
+    if matches!(pos_ctx, PositionCtx::String) {
+        return None;
+    }
+
     // Don't show the bultin symbols in the following contexts
     if !matches!(
         pos_ctx,
@@ -564,6 +575,14 @@ fn get_completion_candidates(
 
     match &pos_ctx {
         PositionCtx::Module => {
+            completion_candidates.extend(get_completion_candidates_from_scope(
+                db,
+                path,
+                db.global_scope(path),
+            ));
+        }
+        PositionCtx::FString => {
+            // TODO: get the completion candidates of the enclosing scope
             completion_candidates.extend(get_completion_candidates_from_scope(
                 db,
                 path,

@@ -280,4 +280,10 @@ where
         }
         self.pop_node();
     }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'b ast::FStringElement) {
+        self.push_node(f_string_element);
+        visitor::walk_f_string_element(self, f_string_element);
+        self.pop_node();
+    }
 }
