@@ -4,11 +4,11 @@ use std::{
     sync::Arc,
 };
 
-use sith_python_ast_utils::nodes::NodeId;
-use sith_python_utils::is_python_module;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_text_size::TextRange;
 use serde::{Deserialize, Serialize};
+use sith_python_ast_utils::nodes::NodeId;
+use sith_python_utils::is_python_module;
 
 use crate::{db::FileId, symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
 
@@ -70,7 +70,7 @@ pub enum DeclarationKind {
     InstanceParameter(SymbolId),
     For,
     WithItem,
-    MatchAs,
+    PatternMatch,
     Exception,
     Named,
 

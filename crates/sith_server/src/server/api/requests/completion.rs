@@ -430,7 +430,7 @@ fn get_completion_item_kind(
         | DeclarationKind::WithItem
         | DeclarationKind::Exception
         | DeclarationKind::Named
-        | DeclarationKind::MatchAs
+        | DeclarationKind::PatternMatch
         | DeclarationKind::For => CompletionItemKind::VARIABLE,
         _ => return None,
     })

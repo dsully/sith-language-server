@@ -1,6 +1,12 @@
 use std::{path::Path, sync::Arc};
 
 use bitflags::bitflags;
+use ruff_python_resolver::{
+    config::Config, execution_environment::ExecutionEnvironment, import_result::ImportType,
+    resolver::resolve_import,
+};
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 use sith_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -11,12 +17,6 @@ use sith_python_ast_utils::{
     nodes::{NodeId, Nodes},
 };
 use sith_python_utils::{is_python_module, PythonHost};
-use ruff_python_resolver::{
-    config::Config, execution_environment::ExecutionEnvironment, import_result::ImportType,
-    resolver::resolve_import,
-};
-use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
 
 use crate::{
     db::FileId,
@@ -343,7 +343,7 @@ impl<'a> SymbolTableBuilder<'a> {
     fn handle_context(&mut self, ctx: &ContextExpr, name: &str, range: &TextRange) {
         if ctx == &ContextExpr::Store {
             let Some(declaration_node) = self.curr_declaration_node else {
-                unreachable!("declaration node wasn't set")
+                unreachable!("declaration node wasn't set for `{name}` at {range:?}")
             };
             let node_with_parent = self.nodes.get(declaration_node).unwrap();
             let kind = match node_with_parent.node() {
@@ -355,7 +355,15 @@ impl<'a> SymbolTableBuilder<'a> {
                 AnyNodeRef::StmtAugAssign(_) => DeclarationKind::Stmt(DeclStmt::AugAssign),
                 AnyNodeRef::StmtAnnAssign(_) => DeclarationKind::Stmt(DeclStmt::AnnAssign),
                 AnyNodeRef::StmtTypeAlias(_) => DeclarationKind::Stmt(DeclStmt::TypeAlias),
-                _ => unreachable!("declaration node not handled!"),
+                // These prevent the server from crashing if the pattern match has invalid syntax
+                AnyNodeRef::PatternMatchMapping(_) | AnyNodeRef::PatternMatchValue(_) => {
+                    DeclarationKind::PatternMatch
+                }
+                _ => unreachable!(
+                    "declaration node not handled: {:?}\n{:#?}",
+                    self.file_info.path,
+                    node_with_parent.node()
+                ),
             };
 
             self.push_declaration(name, kind, *range, declaration_node);
@@ -902,13 +910,14 @@ where
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
         let node_id = self.push_node(pattern);
+        self.set_declaration_node(node_id);
         match pattern {
             Pattern::MatchAs(ast::PatternMatchAs { name, pattern, .. }) => {
                 if let Some(pattern) = pattern {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.push_declaration(name, DeclarationKind::MatchAs, name.range, node_id);
+                    self.push_declaration(name, DeclarationKind::PatternMatch, name.range, node_id);
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
@@ -918,6 +927,7 @@ where
             }
             _ => visitor::walk_pattern(self, pattern),
         }
+        self.clear_declaration_node();
         self.pop_node();
     }
 
