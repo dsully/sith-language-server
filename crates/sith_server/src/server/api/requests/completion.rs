@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use sith_python_ast::{self as ast, AnyNodeRef, Expr};
 use sith_python_ast_utils::{
     node_at_offset, node_at_row,
-    nodes::{NodeId, Nodes},
+    nodes::{NodeId, NodeWithParent, Nodes},
 };
 use sith_python_utils::get_python_module_names_in_path;
 use sith_semantic_model::{
@@ -227,6 +227,17 @@ fn position_context<'nodes>(
         return PositionCtx::Module;
     };
 
+    node_position_ctx(node, db, path, scope_id, nodes, offset)
+}
+
+fn node_position_ctx<'nodes>(
+    node: &NodeWithParent<'nodes>,
+    db: &SymbolTableDb,
+    path: &Arc<PathBuf>,
+    scope_id: ScopeId,
+    nodes: &'nodes Nodes,
+    offset: u32,
+) -> PositionCtx<'nodes> {
     match node.node() {
         AnyNodeRef::StmtClassDef(ast::ClassDefStmt { name, .. }) => {
             let Some(declaration) = db.symbol_declaration(
@@ -336,6 +347,9 @@ fn position_context<'nodes>(
         {
             PositionCtx::TypeParamAnnotation(scope_id)
         }
+        AnyNodeRef::Parameter(param) if is_in_type_param_annotation(offset, param) => {
+            PositionCtx::TypeParamAnnotation(scope_id)
+        }
         AnyNodeRef::Parameter(_) => PositionCtx::ParameterName,
         AnyNodeRef::NameExpr(_) => {
             let Some(parent_node) = node.parent_id().and_then(|node_id| nodes.get(node_id)) else {
@@ -343,14 +357,16 @@ fn position_context<'nodes>(
             };
 
             match parent_node.node() {
-                AnyNodeRef::CallExpr(call_expr) => {
-                    get_call_expr_position_ctx(&call_expr.func, db, path, scope_id, nodes)
+                AnyNodeRef::ExprStmt(_) => {
+                    let Some(granparent_node) = parent_node
+                        .parent_id()
+                        .and_then(|node_id| nodes.get(node_id))
+                    else {
+                        return PositionCtx::Module;
+                    };
+                    node_position_ctx(granparent_node, db, path, scope_id, nodes, offset)
                 }
-                AnyNodeRef::Parameter(param) if is_in_type_param_annotation(offset, param) => {
-                    PositionCtx::TypeParamAnnotation(scope_id)
-                }
-                AnyNodeRef::FStringExpressionElement(_) => PositionCtx::FString,
-                _ => PositionCtx::Module,
+                _ => node_position_ctx(parent_node, db, path, scope_id, nodes, offset),
             }
         }
         AnyNodeRef::CallExpr(ast::CallExpr { func, .. }) => {
