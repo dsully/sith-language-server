@@ -1298,7 +1298,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 798..819,
+                    range: 798..821,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("X"),

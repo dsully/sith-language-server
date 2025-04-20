@@ -3,11 +3,11 @@ use std::fmt::Display;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use sith_python_ast::name::Name;
 use sith_python_ast::{
     self as ast, ContextExpr, ExceptHandler, Expr, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
@@ -1804,7 +1804,10 @@ impl<'src> Parser<'src> {
             range: if body.is_empty() {
                 TextRange::new(start, self.current_token_range().end())
             } else {
-                self.node_range(start)
+                // Set the function's range to end at the DEDENT token.
+                // Although `current_token_range` doesn't return the DEDENT range itself,
+                // the start position of the current token aligns with it.
+                TextRange::new(start, self.current_token_range().start())
             },
             name,
             type_params: type_params.map(Box::new),
@@ -1864,7 +1867,10 @@ impl<'src> Parser<'src> {
             range: if body.is_empty() {
                 TextRange::new(start, self.current_token_range().end())
             } else {
-                self.node_range(start)
+                // Set the class range to end at the DEDENT token.
+                // Although `current_token_range` doesn't return the DEDENT range itself,
+                // the start position of the current token aligns with it.
+                TextRange::new(start, self.current_token_range().start())
             },
             decorator_list,
             name,

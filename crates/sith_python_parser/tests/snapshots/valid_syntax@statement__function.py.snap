@@ -11,7 +11,7 @@ Module(
         body: [
             FunctionDef(
                 FunctionDefStmt {
-                    range: 0..29,
+                    range: 0..32,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -39,7 +39,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 32..76,
+                    range: 32..79,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -104,7 +104,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 79..149,
+                    range: 79..152,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -187,7 +187,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 152..226,
+                    range: 152..229,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -271,7 +271,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 229..296,
+                    range: 229..299,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -337,7 +337,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 299..393,
+                    range: 299..396,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -439,7 +439,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 396..445,
+                    range: 396..448,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -504,7 +504,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 448..517,
+                    range: 448..520,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -587,7 +587,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 520..594,
+                    range: 520..597,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -679,7 +679,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 597..676,
+                    range: 597..679,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -771,7 +771,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 679..774,
+                    range: 679..777,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -872,7 +872,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 777..835,
+                    range: 777..838,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -975,7 +975,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 838..916,
+                    range: 838..919,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1096,7 +1096,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 919..1013,
+                    range: 919..1016,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1226,7 +1226,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1016..1121,
+                    range: 1016..1124,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1356,7 +1356,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1124..1245,
+                    range: 1124..1248,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1495,7 +1495,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1248..1316,
+                    range: 1248..1319,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1597,7 +1597,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1319..1407,
+                    range: 1319..1410,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1717,7 +1717,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1410..1520,
+                    range: 1410..1523,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1846,7 +1846,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1523..1654,
+                    range: 1523..1703,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -1984,7 +1984,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1703..1735,
+                    range: 1703..1738,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2058,7 +2058,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1738..1775,
+                    range: 1738..1778,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2140,7 +2140,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1778..1824,
+                    range: 1778..1827,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2238,7 +2238,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1827..1873,
+                    range: 1827..1876,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2341,7 +2341,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1876..1934,
+                    range: 1876..1937,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2439,7 +2439,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1937..1978,
+                    range: 1937..1981,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2523,7 +2523,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 1981..2000,
+                    range: 1981..2003,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2556,7 +2556,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2003..2064,
+                    range: 2003..2067,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2624,7 +2624,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2067..2091,
+                    range: 2067..2094,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2661,7 +2661,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2094..2121,
+                    range: 2094..2124,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2698,7 +2698,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2124..2158,
+                    range: 2124..2161,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2744,7 +2744,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2161..2184,
+                    range: 2161..2187,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2785,7 +2785,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2187..2213,
+                    range: 2187..2216,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2839,7 +2839,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2216..2242,
+                    range: 2216..2245,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2889,7 +2889,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2245..2277,
+                    range: 2245..2280,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -2955,7 +2955,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2280..2309,
+                    range: 2280..2312,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -3018,7 +3018,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2312..2357,
+                    range: 2312..2360,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -3132,7 +3132,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 2360..2398,
+                    range: 2360..2399,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {

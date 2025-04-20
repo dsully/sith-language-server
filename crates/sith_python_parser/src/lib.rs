@@ -72,8 +72,8 @@ pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
-use sith_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use sith_python_ast::{Expr, Mod, ModExpression, ModModule, PySourceType, Suite};
 
 mod error;
 pub mod lexer;

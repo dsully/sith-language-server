@@ -11,7 +11,7 @@ Module(
         body: [
             ClassDef(
                 ClassDefStmt {
-                    range: 0..14,
+                    range: 0..15,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
@@ -35,7 +35,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 15..31,
+                    range: 15..32,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),

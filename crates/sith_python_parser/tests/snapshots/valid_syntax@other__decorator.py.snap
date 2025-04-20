@@ -11,7 +11,7 @@ Module(
         body: [
             FunctionDef(
                 FunctionDefStmt {
-                    range: 0..40,
+                    range: 0..43,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -50,7 +50,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 43..80,
+                    range: 43..83,
                     decorator_list: [
                         Decorator {
                             range: 43..59,
@@ -80,7 +80,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 83..106,
+                    range: 83..109,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -124,7 +124,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 109..128,
+                    range: 109..131,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -188,7 +188,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 131..153,
+                    range: 131..156,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -262,7 +262,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 156..185,
+                    range: 156..188,
                     decorator_list: [
                         Decorator {
                             range: 156..158,
@@ -352,7 +352,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 188..269,
+                    range: 188..360,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -555,7 +555,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 360..380,
+                    range: 360..383,
                     is_async: false,
                     decorator_list: [
                         Decorator {

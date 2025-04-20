@@ -33,7 +33,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 18..32,
+                    range: 18..33,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {

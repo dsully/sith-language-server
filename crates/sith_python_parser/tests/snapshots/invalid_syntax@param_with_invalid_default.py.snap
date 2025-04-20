@@ -11,7 +11,7 @@ Module(
         body: [
             FunctionDef(
                 FunctionDefStmt {
-                    range: 0..20,
+                    range: 0..21,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -71,7 +71,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 21..43,
+                    range: 21..44,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -131,7 +131,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 44..67,
+                    range: 44..68,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {

@@ -11,7 +11,7 @@ Module(
         body: [
             ClassDef(
                 ClassDefStmt {
-                    range: 0..19,
+                    range: 0..22,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -35,7 +35,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 22..80,
+                    range: 22..83,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -52,7 +52,7 @@ Module(
                     body: [
                         FunctionDef(
                             FunctionDefStmt {
-                                range: 44..80,
+                                range: 44..83,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
@@ -96,7 +96,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 83..116,
+                    range: 83..119,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -169,7 +169,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 119..168,
+                    range: 119..171,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -180,7 +180,7 @@ Module(
                     body: [
                         FunctionDef(
                             FunctionDefStmt {
-                                range: 135..168,
+                                range: 135..171,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
@@ -243,7 +243,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 171..289,
+                    range: 171..331,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -275,7 +275,7 @@ Module(
                     body: [
                         FunctionDef(
                             FunctionDefStmt {
-                                range: 193..225,
+                                range: 193..231,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
@@ -316,7 +316,7 @@ Module(
                         ),
                         FunctionDef(
                             FunctionDefStmt {
-                                range: 231..289,
+                                range: 231..331,
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
@@ -390,7 +390,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 331..351,
+                    range: 331..376,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -437,7 +437,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 376..402,
+                    range: 376..425,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -492,7 +492,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 425..450,
+                    range: 425..485,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -547,7 +547,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 485..522,
+                    range: 485..551,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -623,7 +623,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 551..585,
+                    range: 551..606,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -694,7 +694,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 606..629,
+                    range: 606..648,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -752,7 +752,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 648..672,
+                    range: 648..689,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -810,7 +810,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 689..711,
+                    range: 689..741,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -856,7 +856,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 741..789,
+                    range: 741..827,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -952,7 +952,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 827..868,
+                    range: 827..882,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -1041,7 +1041,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 882..904,
+                    range: 882..931,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -1087,7 +1087,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 931..966,
+                    range: 931..982,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),
@@ -1156,7 +1156,7 @@ Module(
             ),
             ClassDef(
                 ClassDefStmt {
-                    range: 982..1022,
+                    range: 982..1023,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Test"),

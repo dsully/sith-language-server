@@ -40,7 +40,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 16..32,
+                    range: 16..33,
                     is_async: false,
                     decorator_list: [
                         Decorator {
@@ -84,7 +84,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 33..50,
+                    range: 33..51,
                     is_async: false,
                     decorator_list: [
                         Decorator {

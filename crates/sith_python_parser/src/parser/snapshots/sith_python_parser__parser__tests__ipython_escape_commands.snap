@@ -124,7 +124,7 @@ Module(
             ),
             FunctionDef(
                 FunctionDefStmt {
-                    range: 566..626,
+                    range: 566..656,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
