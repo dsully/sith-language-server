@@ -157,7 +157,7 @@ fn get_call_expr_at_offset_in_arguments<'a>(
     }
 
     matches!(node.node(), AnyNodeRef::CallExpr(ast::CallExpr { arguments, .. })
-        if arguments.range.contains(offset.into()))
+        if arguments.range.contains_inclusive(offset.into()))
     .then(|| node.node().as_call_expr())
     .flatten()
     .copied()
