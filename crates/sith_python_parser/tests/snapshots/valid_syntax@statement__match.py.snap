@@ -32,7 +32,10 @@ Module(
                                             operand: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 86..88,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x0, 0x0) [0],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -954,14 +957,19 @@ Module(
                                             left: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 755..759,
-                                                    value: Float,
+                                                    value: Float(
+                                                        Float(0x3fd00000, 0x0) [0.25],
+                                                    ),
                                                 },
                                             ),
                                             op: Add,
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 762..767,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ffc0000, 0x0) [1.75],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -1020,7 +1028,10 @@ Module(
                                             operand: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 824..826,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x0, 0x0) [0],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -2090,7 +2101,9 @@ Module(
                                                     operand: NumberLiteral(
                                                         NumberLiteralExpr {
                                                             range: 1637..1641,
-                                                            value: Float,
+                                                            value: Float(
+                                                                Float(0x3fd00000, 0x0) [0.25],
+                                                            ),
                                                         },
                                                     ),
                                                 },
@@ -2099,7 +2112,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 1644..1649,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ffc0000, 0x0) [1.75],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -4688,7 +4704,9 @@ Module(
                                     value: NumberLiteral(
                                         NumberLiteralExpr {
                                             range: 3644..3647,
-                                            value: Float,
+                                            value: Float(
+                                                Float(0x3ff00000, 0x0) [1],
+                                            ),
                                         },
                                     ),
                                 },
@@ -4715,7 +4733,10 @@ Module(
                                     value: NumberLiteral(
                                         NumberLiteralExpr {
                                             range: 3670..3674,
-                                            value: Complex,
+                                            value: Complex {
+                                                real: Float(0x0, 0x0) [0],
+                                                imag: Float(0x3ff00000, 0x0) [1],
+                                            },
                                         },
                                     ),
                                 },
@@ -4754,7 +4775,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 3701..3703,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ff00000, 0x0) [1],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -4822,7 +4846,9 @@ Module(
                                             operand: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 3752..3754,
-                                                    value: Float,
+                                                    value: Float(
+                                                        Float(0x3ff00000, 0x0) [1],
+                                                    ),
                                                 },
                                             ),
                                         },
@@ -5004,7 +5030,9 @@ Module(
                                                 value: NumberLiteral(
                                                     NumberLiteralExpr {
                                                         range: 3891..3894,
-                                                        value: Float,
+                                                        value: Float(
+                                                            Float(0x3ff19999, 0x9999999a) [1.1],
+                                                        ),
                                                     },
                                                 ),
                                             },
@@ -5046,7 +5074,10 @@ Module(
                                                         right: NumberLiteral(
                                                             NumberLiteralExpr {
                                                                 range: 3906..3908,
-                                                                value: Complex,
+                                                                value: Complex {
+                                                                    real: Float(0x0, 0x0) [0],
+                                                                    imag: Float(0x3ff00000, 0x0) [1],
+                                                                },
                                                             },
                                                         ),
                                                     },
@@ -5261,7 +5292,10 @@ Module(
                                                         right: NumberLiteral(
                                                             NumberLiteralExpr {
                                                                 range: 4056..4058,
-                                                                value: Complex,
+                                                                value: Complex {
+                                                                    real: Float(0x0, 0x0) [0],
+                                                                    imag: Float(0x40080000, 0x0) [3],
+                                                                },
                                                             },
                                                         ),
                                                     },
@@ -5563,7 +5597,10 @@ Module(
                                                         right: NumberLiteral(
                                                             NumberLiteralExpr {
                                                                 range: 4274..4276,
-                                                                value: Complex,
+                                                                value: Complex {
+                                                                    real: Float(0x0, 0x0) [0],
+                                                                    imag: Float(0x40000000, 0x0) [2],
+                                                                },
                                                             },
                                                         ),
                                                     },
@@ -5751,7 +5788,10 @@ Module(
                                                         right: NumberLiteral(
                                                             NumberLiteralExpr {
                                                                 range: 4364..4366,
-                                                                value: Complex,
+                                                                value: Complex {
+                                                                    real: Float(0x0, 0x0) [0],
+                                                                    imag: Float(0x3ff00000, 0x0) [1],
+                                                                },
                                                             },
                                                         ),
                                                     },

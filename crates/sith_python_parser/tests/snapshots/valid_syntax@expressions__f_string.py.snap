@@ -729,7 +729,9 @@ Module(
                                                                                             expression: NumberLiteral(
                                                                                                 NumberLiteralExpr {
                                                                                                     range: 197..203,
-                                                                                                    value: Float,
+                                                                                                    value: Float(
+                                                                                                        Float(0x400921ca, 0xc083126f) [3.1415],
+                                                                                                    ),
                                                                                                 },
                                                                                             ),
                                                                                             debug_text: Some(

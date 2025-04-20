@@ -568,7 +568,9 @@ Module(
                             func: NumberLiteral(
                                 NumberLiteralExpr {
                                     range: 343..346,
-                                    value: Float,
+                                    value: Float(
+                                        Float(0x3ff00000, 0x0) [1],
+                                    ),
                                 },
                             ),
                             arguments: Arguments {

@@ -49,7 +49,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 44..46,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ff00000, 0x0) [1],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -84,7 +87,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 74..76,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40000000, 0x0) [2],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -119,7 +125,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 104..106,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40080000, 0x0) [3],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -169,7 +178,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 140..142,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40100000, 0x0) [4],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -221,7 +233,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 175..177,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40140000, 0x0) [5],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -274,7 +289,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 213..215,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40180000, 0x0) [6],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -301,14 +319,20 @@ Module(
                                             left: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 239..241,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ff00000, 0x0) [1],
+                                                    },
                                                 },
                                             ),
                                             op: Add,
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 244..246,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40000000, 0x0) [2],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -339,7 +363,10 @@ Module(
                                                     operand: NumberLiteral(
                                                         NumberLiteralExpr {
                                                             range: 271..273,
-                                                            value: Complex,
+                                                            value: Complex {
+                                                                real: Float(0x0, 0x0) [0],
+                                                                imag: Float(0x3ff00000, 0x0) [1],
+                                                            },
                                                         },
                                                     ),
                                                 },
@@ -348,7 +375,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 276..278,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x40000000, 0x0) [2],
+                                                    },
                                                 },
                                             ),
                                         },
@@ -401,7 +431,10 @@ Module(
                                             right: NumberLiteral(
                                                 NumberLiteralExpr {
                                                     range: 316..318,
-                                                    value: Complex,
+                                                    value: Complex {
+                                                        real: Float(0x0, 0x0) [0],
+                                                        imag: Float(0x3ff00000, 0x0) [1],
+                                                    },
                                                 },
                                             ),
                                         },

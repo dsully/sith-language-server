@@ -160,7 +160,9 @@ Module(
                         NumberLiteral(
                             NumberLiteralExpr {
                                 range: 64..67,
-                                value: Float,
+                                value: Float(
+                                    Float(0x3ff00000, 0x0) [1],
+                                ),
                             },
                         ),
                         StringLiteral(

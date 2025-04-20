@@ -59,7 +59,10 @@ Module(
                                                 operand: NumberLiteral(
                                                     NumberLiteralExpr {
                                                         range: 173..175,
-                                                        value: Complex,
+                                                        value: Complex {
+                                                            real: Float(0x0, 0x0) [0],
+                                                            imag: Float(0x3ff00000, 0x0) [1],
+                                                        },
                                                     },
                                                 ),
                                             },

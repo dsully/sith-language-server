@@ -27,7 +27,9 @@ Module(
                     value: NumberLiteral(
                         NumberLiteralExpr {
                             range: 1..3,
-                            value: Float,
+                            value: Float(
+                                Float(0x3fb99999, 0x9999999a) [0.1],
+                            ),
                         },
                     ),
                 },
@@ -50,7 +52,9 @@ Module(
                     value: NumberLiteral(
                         NumberLiteralExpr {
                             range: 5..7,
-                            value: Float,
+                            value: Float(
+                                Float(0x3fb99999, 0x9999999a) [0.1],
+                            ),
                         },
                     ),
                 },
@@ -61,7 +65,9 @@ Module(
                     value: NumberLiteral(
                         NumberLiteralExpr {
                             range: 7..9,
-                            value: Float,
+                            value: Float(
+                                Float(0x0, 0x0) [0],
+                            ),
                         },
                     ),
                 },

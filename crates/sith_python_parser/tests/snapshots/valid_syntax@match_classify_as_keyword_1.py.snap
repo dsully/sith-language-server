@@ -90,7 +90,9 @@ Module(
                     subject: NumberLiteral(
                         NumberLiteralExpr {
                             range: 58..61,
-                            value: Float,
+                            value: Float(
+                                Float(0x3ff00000, 0x0) [1],
+                            ),
                         },
                     ),
                     cases: [
@@ -126,7 +128,10 @@ Module(
                     subject: NumberLiteral(
                         NumberLiteralExpr {
                             range: 85..87,
-                            value: Complex,
+                            value: Complex {
+                                real: Float(0x0, 0x0) [0],
+                                imag: Float(0x3ff00000, 0x0) [1],
+                            },
                         },
                     ),
                     cases: [
