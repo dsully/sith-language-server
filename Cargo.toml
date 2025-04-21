@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.2.3-alpha"
+version = "0.2.4-alpha"
 edition = "2021"
 repository = "https://github.com/LaBatata101/sith-language-server"
 authors = ["LaBatata101 <labatata101@gmail.com>"]

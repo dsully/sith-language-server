@@ -1581,7 +1581,7 @@ checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "sith-lsp"
-version = "0.2.3-alpha"
+version = "0.2.4-alpha"
 dependencies = [
  "anyhow",
  "sith_server",
@@ -1706,7 +1706,7 @@ dependencies = [
 
 [[package]]
 name = "sith_server"
-version = "0.2.3-alpha"
+version = "0.2.4-alpha"
 dependencies = [
  "anyhow",
  "compact_str",
