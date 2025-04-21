@@ -1,0 +1,10 @@
+[package]
+name = "sith-lsp"
+version = { workspace = true }
+repository = { workspace = true }
+edition = { workspace = true }
+
+
+[dependencies]
+sith_server = { workspace = true }
+anyhow = { workspace = true }
