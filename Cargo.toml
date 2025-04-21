@@ -107,7 +107,6 @@ targets = [
     "aarch64-apple-darwin",
     "aarch64-unknown-linux-gnu",
     "aarch64-unknown-linux-musl",
-    "aarch64-pc-windows-msvc",
     "x86_64-apple-darwin",
     "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
@@ -129,3 +128,22 @@ local-artifacts-jobs = ["./build-vscode-extension"]
 install-updater = false
 # Path that installers should place binaries in
 install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+
+[workspace.metadata.dist.github-custom-runners]
+global = "ubuntu-latest"
+
+[workspace.metadata.dist.github-custom-runners.x86_64-unknown-linux-gnu]
+runner = "ubuntu-latest"
+container = { image = "quay.io/pypa/manylinux_2_28_x86_64", host = "x86_64-unknown-linux-musl" }
+
+[workspace.metadata.dist.github-custom-runners.aarch64-unknown-linux-gnu]
+runner = "ubuntu-latest"
+container = { image = "quay.io/pypa/manylinux_2_28_x86_64", host = "x86_64-unknown-linux-musl" }
+
+[workspace.metadata.dist.github-custom-runners.x86_64-unknown-linux-musl]
+runner = "ubuntu-latest"
+container = { image = "quay.io/pypa/musllinux_1_2_x86_64", host = "x86_64-unknown-linux-musl" }
+
+[workspace.metadata.dist.github-custom-runners.aarch64-unknown-linux-musl]
+runner = "ubuntu-latest"
+container = { image = "quay.io/pypa/manylinux_2_28_x86_64", host = "x86_64-unknown-linux-musl" }
