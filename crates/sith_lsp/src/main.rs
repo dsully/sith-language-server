@@ -1,6 +1,27 @@
 use std::num::NonZeroUsize;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() -> anyhow::Result<()> {
+    if let Some(arg) = std::env::args().nth(1) {
+        match arg.as_str() {
+            "--version" | "-v" => {
+                println!("{}", VERSION);
+            }
+            "--help" | "-h" => {
+                print_help();
+            }
+            _ => {
+                println!("Unknow option '{arg}'. Use --help to list the available options.");
+            }
+        }
+        Ok(())
+    } else {
+        run_server()
+    }
+}
+
+fn run_server() -> anyhow::Result<()> {
     let max_cpu_count = NonZeroUsize::new(4).unwrap();
 
     let worker_threads = std::thread::available_parallelism()
@@ -11,4 +32,17 @@ fn main() -> anyhow::Result<()> {
     )?;
 
     server.run()
+}
+
+fn print_help() {
+    println!(
+        "SithLSP: An experimental An experimental Python language server made in Rust.
+
+Usage: sith-lsp [OPTIONS]
+
+Options:
+  -v, --version    Print version
+  -h, --help       Print help
+"
+    );
 }
