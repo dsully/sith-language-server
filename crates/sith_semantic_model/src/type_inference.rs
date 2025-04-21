@@ -134,6 +134,37 @@ impl KnownClass {
         KnownClass::create_builtin_type(db, KnownClass::Tuple)
     }
 
+    fn string(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Str)
+    }
+
+    fn bool(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Bool)
+    }
+
+    fn float(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Float)
+    }
+
+    fn int(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Int)
+    }
+
+    fn complex(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Complex)
+    }
+
+    fn bytes(db: &SymbolTableDb) -> ClassType {
+        KnownClass::create_builtin_type(db, KnownClass::Bytes)
+    }
+
+    fn is_number_like(&self) -> bool {
+        matches!(
+            self,
+            KnownClass::Int | KnownClass::Float | KnownClass::Complex | KnownClass::Bool
+        )
+    }
+
     fn as_str(&self) -> &str {
         match self {
             KnownClass::Bool => "bool",
@@ -162,7 +193,6 @@ impl KnownClass {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PythonType {
     Module(ImportSource),
-    Number(NumberLike),
     String,
     Bytes,
     None,
@@ -214,6 +244,32 @@ pub struct ClassType {
 impl ClassType {
     pub(crate) fn is_object(&self) -> bool {
         matches!(self.known, Some(KnownClass::Object))
+    }
+
+    pub(crate) fn is_number_like(&self) -> bool {
+        self.known.is_some_and(|known| known.is_number_like())
+    }
+
+    /// Coerces two number-like class instance to the "highest" number-like class instance.
+    ///
+    /// # Panics
+    /// If this class instance is not number-like or is not a known instance.
+    fn coerce(self, db: &SymbolTableDb, other: ClassType) -> ClassType {
+        let known = self.known.expect("Expect class to have known instance.");
+        let other_known = other
+            .known
+            .expect("Expect other class to have known instance.");
+
+        assert!(
+            known.is_number_like() && other_known.is_number_like(),
+            "Expect class to be number-like."
+        );
+
+        match (known, other_known) {
+            (KnownClass::Complex, _) | (_, KnownClass::Complex) => KnownClass::complex(db),
+            (KnownClass::Float, _) | (_, KnownClass::Float) => KnownClass::float(db),
+            _ => KnownClass::int(db),
+        }
     }
 
     pub fn node_stack<'db>(&self, db: &'db SymbolTableDb) -> NodeStack<'db> {
@@ -293,48 +349,132 @@ impl ClassType {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub enum NumberLike {
-    Int,
-    Float,
-    Complex,
-    Bool,
-}
-
-impl NumberLike {
-    /// Coerces two number-like types to the "highest" number-like type.
-    #[must_use]
-    pub fn coerce(self, other: NumberLike) -> NumberLike {
-        match (self, other) {
-            (NumberLike::Complex, _) | (_, NumberLike::Complex) => NumberLike::Complex,
-            (NumberLike::Float, _) | (_, NumberLike::Float) => NumberLike::Float,
-            _ => NumberLike::Int,
-        }
-    }
-}
-
 impl PythonType {
     fn is_subtype_of(&self, other: &PythonType) -> bool {
         match (self, other) {
-            (PythonType::String, PythonType::String) => true,
-            (PythonType::Bytes, PythonType::Bytes) => true,
             (PythonType::None, PythonType::None) => true,
             (PythonType::Ellipsis, PythonType::Ellipsis) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Str),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Str),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bytes),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bytes),
+                    ..
+                }),
+            ) => true,
             // The Numeric Tower (https://peps.python.org/pep-3141/)
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Bool)) => true,
-            (PythonType::Number(NumberLike::Int), PythonType::Number(NumberLike::Int)) => true,
-            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Float)) => true,
-            (PythonType::Number(NumberLike::Complex), PythonType::Number(NumberLike::Complex)) => {
-                true
-            }
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Int)) => true,
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Float)) => true,
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Complex)) => true,
-            (PythonType::Number(NumberLike::Int), PythonType::Number(NumberLike::Float)) => true,
-            (PythonType::Number(NumberLike::Int), PythonType::Number(NumberLike::Complex)) => true,
-            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Complex)) => {
-                true
-            }
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bool),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bool),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Int),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Int),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Float),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Float),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Complex),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Complex),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bool),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Int),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bool),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Float),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Bool),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Complex),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Int),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Float),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Int),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Complex),
+                    ..
+                }),
+            ) => true,
+            (
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Float),
+                    ..
+                }),
+                PythonType::Class(ClassType {
+                    known: Some(KnownClass::Complex),
+                    ..
+                }),
+            ) => true,
             _ => false,
         }
     }
@@ -351,12 +491,6 @@ impl PythonType {
                         .unwrap_or("Unresolved".into())
                 )
             }
-            PythonType::Number(number) => match number {
-                NumberLike::Int => "int".into(),
-                NumberLike::Float => "float".into(),
-                NumberLike::Complex => "complex".into(),
-                NumberLike::Bool => "bool".into(),
-            },
             PythonType::String => "str".into(),
             PythonType::Bytes => "bytes".into(),
             PythonType::None => "None".into(),
@@ -482,17 +616,19 @@ impl ResolvedType {
     }
 }
 
-fn infer_literal_expr_type(literal: &AnyNodeRef) -> ResolvedType {
+fn infer_literal_expr_type(db: &SymbolTableDb, literal: &AnyNodeRef) -> ResolvedType {
     let python_type = match literal {
         AnyNodeRef::NoneLiteralExpr(_) => PythonType::None,
-        AnyNodeRef::BooleanLiteralExpr(_) => PythonType::Number(NumberLike::Bool),
-        AnyNodeRef::StringLiteralExpr(_) | AnyNodeRef::FStringExpr(_) => PythonType::String,
-        AnyNodeRef::BytesLiteralExpr(_) => PythonType::Bytes,
         AnyNodeRef::EllipsisLiteralExpr(_) => PythonType::Ellipsis,
+        AnyNodeRef::BooleanLiteralExpr(_) => PythonType::Class(KnownClass::bool(db)),
+        AnyNodeRef::StringLiteralExpr(_) | AnyNodeRef::FStringExpr(_) => {
+            PythonType::Class(KnownClass::string(db))
+        }
+        AnyNodeRef::BytesLiteralExpr(_) => PythonType::Class(KnownClass::bytes(db)),
         AnyNodeRef::NumberLiteralExpr(ast::NumberLiteralExpr { value, .. }) => match value {
-            Number::Int(_) => PythonType::Number(NumberLike::Int),
-            Number::Float(_) => PythonType::Number(NumberLike::Float),
-            Number::Complex { .. } => PythonType::Number(NumberLike::Complex),
+            Number::Int(_) => PythonType::Class(KnownClass::int(db)),
+            Number::Float(_) => PythonType::Class(KnownClass::float(db)),
+            Number::Complex { .. } => PythonType::Class(KnownClass::complex(db)),
         },
         _ => unreachable!("expression is not a literal"),
     };
@@ -751,21 +887,24 @@ impl<'db> TypeInferer<'db> {
                 .unwrap_or(ResolvedType::Unknown),
             AnyNodeRef::UnaryOpExpr(ast::UnaryOpExpr { op, operand, .. }) => match op {
                 UnaryOp::Invert => match self.infer_expr(operand.as_ref(), nodes) {
-                    ResolvedType::KnownType(PythonType::Number(
-                        NumberLike::Bool | NumberLike::Int,
-                    )) => ResolvedType::KnownType(PythonType::Number(NumberLike::Int)),
+                    ResolvedType::KnownType(PythonType::Class(ClassType {
+                        known: Some(KnownClass::Bool | KnownClass::Int),
+                        ..
+                    })) => ResolvedType::KnownType(PythonType::Class(KnownClass::int(self.db))),
                     ResolvedType::KnownType(_) => ResolvedType::TypeError,
                     _ => ResolvedType::Unknown,
                 },
-                UnaryOp::Not => ResolvedType::KnownType(PythonType::Number(NumberLike::Bool)),
+                UnaryOp::Not => {
+                    ResolvedType::KnownType(PythonType::Class(KnownClass::bool(self.db)))
+                }
                 UnaryOp::UAdd | UnaryOp::USub => match self.infer_expr(operand.as_ref(), nodes) {
-                    ResolvedType::KnownType(PythonType::Number(number)) => {
-                        ResolvedType::KnownType(PythonType::Number(if number == NumberLike::Bool {
-                            NumberLike::Int
+                    ResolvedType::KnownType(PythonType::Class(number)) => ResolvedType::KnownType(
+                        PythonType::Class(if matches!(number.known, Some(KnownClass::Bool)) {
+                            KnownClass::int(self.db)
                         } else {
                             number
-                        }))
-                    }
+                        }),
+                    ),
                     ResolvedType::KnownType(_) => ResolvedType::TypeError,
                     _ => ResolvedType::Unknown,
                 },
@@ -857,7 +996,7 @@ impl<'db> TypeInferer<'db> {
             | AnyNodeRef::FStringExpr(_)
             | AnyNodeRef::BytesLiteralExpr(_)
             | AnyNodeRef::NumberLiteralExpr(_)
-            | AnyNodeRef::EllipsisLiteralExpr(_) => infer_literal_expr_type(&expr),
+            | AnyNodeRef::EllipsisLiteralExpr(_) => infer_literal_expr_type(self.db, &expr),
             _ => ResolvedType::Unknown,
         }
     }
@@ -1157,10 +1296,12 @@ impl<'db> TypeInferer<'db> {
                     }
                     // Ex) `1 + 1.0`
                     (
-                        ResolvedType::KnownType(PythonType::Number(left)),
-                        ResolvedType::KnownType(PythonType::Number(right)),
-                    ) => {
-                        return ResolvedType::KnownType(PythonType::Number(left.coerce(right)));
+                        ResolvedType::KnownType(PythonType::Class(left)),
+                        ResolvedType::KnownType(PythonType::Class(right)),
+                    ) if left.is_number_like() && right.is_number_like() => {
+                        return ResolvedType::KnownType(PythonType::Class(
+                            left.coerce(self.db, right),
+                        ));
                     }
                     // Ex) `"a" + 1`
                     (ResolvedType::KnownType(_), ResolvedType::KnownType(_)) => {
@@ -1173,10 +1314,12 @@ impl<'db> TypeInferer<'db> {
                 match (left_type, right_type) {
                     // Ex) `1 - 1`
                     (
-                        ResolvedType::KnownType(PythonType::Number(left)),
-                        ResolvedType::KnownType(PythonType::Number(right)),
-                    ) => {
-                        return ResolvedType::KnownType(PythonType::Number(left.coerce(right)));
+                        ResolvedType::KnownType(PythonType::Class(left)),
+                        ResolvedType::KnownType(PythonType::Class(right)),
+                    ) if left.is_number_like() && right.is_number_like() => {
+                        return ResolvedType::KnownType(PythonType::Class(
+                            left.coerce(self.db, right),
+                        ));
                     }
                     // Ex) `{1, 2} - {2}`
                     (
@@ -1220,19 +1363,21 @@ impl<'db> TypeInferer<'db> {
                 }
                 // Ex) `1 % 2`
                 (
-                    ResolvedType::KnownType(PythonType::Number(left)),
-                    ResolvedType::KnownType(PythonType::Number(right)),
-                ) => {
-                    return ResolvedType::KnownType(PythonType::Number(left.coerce(right)));
+                    ResolvedType::KnownType(PythonType::Class(left)),
+                    ResolvedType::KnownType(PythonType::Class(right)),
+                ) if left.is_number_like() && right.is_number_like() => {
+                    return ResolvedType::KnownType(PythonType::Class(left.coerce(self.db, right)));
                 }
                 _ => {}
             },
             // Standard arithmetic operators, which coerce to the "highest" number type.
             Operator::Mult | Operator::FloorDiv | Operator::Pow => match (left_type, right_type) {
                 (
-                    ResolvedType::KnownType(PythonType::Number(left)),
-                    ResolvedType::KnownType(PythonType::Number(right)),
-                ) => return ResolvedType::KnownType(PythonType::Number(left.coerce(right))),
+                    ResolvedType::KnownType(PythonType::Class(left)),
+                    ResolvedType::KnownType(PythonType::Class(right)),
+                ) if left.is_number_like() && right.is_number_like() => {
+                    return ResolvedType::KnownType(PythonType::Class(left.coerce(self.db, right)))
+                }
                 (ResolvedType::KnownType(_), ResolvedType::KnownType(_)) => {
                     return ResolvedType::TypeError;
                 }
@@ -1242,13 +1387,13 @@ impl<'db> TypeInferer<'db> {
             Operator::Div => match (left_type, right_type) {
                 // Ex) `1 / 2`
                 (
-                    ResolvedType::KnownType(PythonType::Number(left)),
-                    ResolvedType::KnownType(PythonType::Number(right)),
-                ) => {
-                    let resolved = left.coerce(right);
-                    return ResolvedType::KnownType(PythonType::Number(
-                        if resolved == NumberLike::Int {
-                            NumberLike::Float
+                    ResolvedType::KnownType(PythonType::Class(left)),
+                    ResolvedType::KnownType(PythonType::Class(right)),
+                ) if left.is_number_like() && right.is_number_like() => {
+                    let resolved = left.coerce(self.db, right);
+                    return ResolvedType::KnownType(PythonType::Class(
+                        if matches!(resolved.known, Some(KnownClass::Int)) {
+                            KnownClass::float(self.db)
                         } else {
                             resolved
                         },
@@ -1267,12 +1412,12 @@ impl<'db> TypeInferer<'db> {
             | Operator::RShift => match (left_type, right_type) {
                 // Ex) `1 & 2`
                 (
-                    ResolvedType::KnownType(PythonType::Number(left)),
-                    ResolvedType::KnownType(PythonType::Number(right)),
-                ) => {
-                    let resolved = left.coerce(right);
-                    return if resolved == NumberLike::Int {
-                        ResolvedType::KnownType(PythonType::Number(NumberLike::Int))
+                    ResolvedType::KnownType(PythonType::Class(left)),
+                    ResolvedType::KnownType(PythonType::Class(right)),
+                ) if left.is_number_like() && right.is_number_like() => {
+                    let resolved = left.coerce(self.db, right);
+                    return if matches!(resolved.known, Some(KnownClass::Int)) {
+                        ResolvedType::KnownType(PythonType::Class(resolved))
                     } else {
                         ResolvedType::TypeError
                     };
@@ -1551,5 +1696,45 @@ match point:
      case x: reveal_type(x)
 "#;
         assert_type(src, "test.py", "class[Point]")
+    }
+
+    #[test]
+    fn test_infer_string_type() {
+        let src = r#"
+reveal_type('HELLO')
+"#;
+        assert_type(src, "test.py", "class[str]");
+    }
+
+    #[test]
+    fn test_infer_int() {
+        let src = r#"
+reveal_type(1)
+"#;
+        assert_type(src, "test.py", "class[int]");
+    }
+
+    #[test]
+    fn test_infer_float() {
+        let src = r#"
+reveal_type(3.14)
+"#;
+        assert_type(src, "test.py", "class[float]");
+    }
+
+    #[test]
+    fn test_infer_complex() {
+        let src = r#"
+reveal_type(3j)
+"#;
+        assert_type(src, "test.py", "class[complex]");
+    }
+
+    #[test]
+    fn test_infer_bool() {
+        let src = r#"
+reveal_type(True)
+"#;
+        assert_type(src, "test.py", "class[bool]");
     }
 }
