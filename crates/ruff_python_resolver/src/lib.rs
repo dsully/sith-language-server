@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod cache;
 pub mod config;
 pub mod execution_environment;
 pub mod host;
@@ -22,6 +23,7 @@ mod tests {
     use log::debug;
     use tempfile::TempDir;
 
+    use crate::cache::ImportResolverCache;
     use crate::config::Config;
     use crate::execution_environment::ExecutionEnvironment;
     use crate::host;
@@ -85,8 +87,8 @@ mod tests {
 
         let execution_environment = ExecutionEnvironment {
             root: root.into(),
-            python_version: PythonVersion::Py37,
-            python_platform: PythonPlatform::Darwin,
+            python_version: PythonVersion::Py313,
+            python_platform: PythonPlatform::Linux,
             extra_paths,
         };
 
@@ -114,6 +116,7 @@ mod tests {
         } else {
             Vec::new()
         });
+        let mut cache = ImportResolverCache::default();
 
         resolve_import(
             source_file.as_ref(),
@@ -121,6 +124,7 @@ mod tests {
             &module_descriptor,
             &config,
             &host,
+            &mut cache,
         )
     }
 

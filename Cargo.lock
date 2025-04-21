@@ -1318,6 +1318,7 @@ dependencies = [
  "env_logger",
  "insta",
  "log",
+ "rustc-hash",
  "tempfile",
 ]
 

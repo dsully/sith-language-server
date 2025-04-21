@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use log::debug;
 
+use crate::cache::ImportResolverCache;
 use crate::config::Config;
 use crate::execution_environment::ExecutionEnvironment;
 use crate::implicit_imports::ImplicitImports;
@@ -263,8 +264,10 @@ fn resolve_best_absolute_import<Host: host::Host>(
     allow_pyi: bool,
     config: &Config,
     host: &Host,
+    cache: &mut ImportResolverCache,
 ) -> Option<ImportResult> {
     let import_name = module_descriptor.name();
+    debug!("Import name: {import_name}");
 
     // Search for local stub files (using `stub_path`).
     if allow_pyi {
@@ -351,7 +354,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
     }
 
     // Look for third-party imports in Python's `sys` path.
-    for search_path in search::python_search_paths(config, host) {
+    for search_path in search::python_search_paths(config, host, cache) {
         debug!("Looking in Python search path: {}", search_path.display());
 
         let mut third_party_import = resolve_absolute_import(
@@ -375,7 +378,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
     // If a library is fully `py.typed`, prefer the current result. There's one exception:
     // we're executing from `typeshed` itself. In that case, use the `typeshed` lookup below,
     // rather than favoring `py.typed` libraries.
-    if let Some(typeshed_root) = search::typeshed_root(config, host) {
+    if let Some(typeshed_root) = search::typeshed_root(config, host, cache) {
         debug!(
             "Looking in typeshed root directory: {}",
             typeshed_root.display()
@@ -393,7 +396,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
         // Check for a stdlib typeshed file.
         debug!("Looking for typeshed stdlib path: {}", import_name);
         if let Some(mut typeshed_stdilib_import) =
-            find_typeshed_path(module_descriptor, true, config, host)
+            find_typeshed_path(module_descriptor, true, config, host, cache)
         {
             typeshed_stdilib_import.is_stdlib_typeshed_file = true;
             return Some(typeshed_stdilib_import);
@@ -402,7 +405,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
         // Check for a third-party typeshed file.
         debug!("Looking for typeshed third-party path: {}", import_name);
         if let Some(mut typeshed_third_party_import) =
-            find_typeshed_path(module_descriptor, false, config, host)
+            find_typeshed_path(module_descriptor, false, config, host, cache)
         {
             typeshed_third_party_import.is_third_party_typeshed_file = true;
 
@@ -427,6 +430,7 @@ fn find_typeshed_path<Host: host::Host>(
     is_std_lib: bool,
     config: &Config,
     host: &Host,
+    cache: &mut ImportResolverCache,
 ) -> Option<ImportResult> {
     if is_std_lib {
         debug!("Looking for typeshed `stdlib` path");
@@ -437,11 +441,11 @@ fn find_typeshed_path<Host: host::Host>(
     let mut typeshed_paths = vec![];
 
     if is_std_lib {
-        if let Some(path) = search::stdlib_typeshed_path(config, host) {
+        if let Some(path) = search::stdlib_typeshed_path(config, host, cache) {
             typeshed_paths.push(path);
         }
     } else if let Some(paths) =
-        search::third_party_typeshed_package_paths(module_descriptor, config, host)
+        search::third_party_typeshed_package_paths(module_descriptor, config, host, cache)
     {
         typeshed_paths.extend(paths);
     }
@@ -635,8 +639,20 @@ fn resolve_import_strict<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
+    cache: &mut ImportResolverCache,
 ) -> ImportResult {
     let import_name = module_descriptor.name();
+
+    if let Some(cached_result) = cache.get_import_result(
+        source_file,
+        &import_name,
+        module_descriptor,
+        execution_environment,
+    ) {
+        debug!("Cache HIT for IMPORT: {import_name}");
+        return cached_result;
+    }
+    debug!("Cache MISS for IMPORT: {import_name}");
 
     if module_descriptor.leading_dots > 0 {
         debug!("Resolving relative import for: {import_name}");
@@ -645,6 +661,14 @@ fn resolve_import_strict<Host: host::Host>(
 
         if let Some(mut relative_import) = relative_import {
             relative_import.is_relative = true;
+
+            cache.add_import_result(
+                source_file,
+                &import_name,
+                execution_environment,
+                relative_import.clone(),
+            );
+
             return relative_import;
         }
     } else {
@@ -656,6 +680,7 @@ fn resolve_import_strict<Host: host::Host>(
             true,
             config,
             host,
+            cache,
         );
 
         if let Some(mut best_import) = best_import {
@@ -669,14 +694,29 @@ fn resolve_import_strict<Host: host::Host>(
                         false,
                         config,
                         host,
+                        cache,
                     )
                     .unwrap_or_else(ImportResult::not_found),
                 ));
             }
+
+            cache.add_import_result(
+                source_file,
+                &import_name,
+                execution_environment,
+                best_import.clone(),
+            );
+
             return best_import;
         }
     }
 
+    cache.add_import_result(
+        source_file,
+        &import_name,
+        execution_environment,
+        ImportResult::not_found(),
+    );
     ImportResult::not_found()
 }
 
@@ -696,6 +736,7 @@ pub fn resolve_import<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
+    cache: &mut ImportResolverCache,
 ) -> ImportResult {
     let import_result = resolve_import_strict(
         source_file,
@@ -703,6 +744,7 @@ pub fn resolve_import<Host: host::Host>(
         module_descriptor,
         config,
         host,
+        cache,
     );
     if import_result.is_import_found || module_descriptor.leading_dots > 0 {
         return import_result;

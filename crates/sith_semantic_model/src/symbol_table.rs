@@ -2,8 +2,8 @@ use std::{path::Path, sync::Arc};
 
 use bitflags::bitflags;
 use ruff_python_resolver::{
-    config::Config, execution_environment::ExecutionEnvironment, import_result::ImportType,
-    resolver::resolve_import,
+    cache::ImportResolverCache, config::Config, execution_environment::ExecutionEnvironment,
+    import_result::ImportType, resolver::resolve_import,
 };
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -167,6 +167,7 @@ pub struct SymbolTableBuilder<'a> {
     table: SymbolTable,
 
     import_resolver_cfg: ImportResolverConfig<'a>,
+    import_resolver_cache: ImportResolverCache,
 }
 
 impl<'a> SymbolTableBuilder<'a> {
@@ -191,6 +192,7 @@ impl<'a> SymbolTableBuilder<'a> {
             table: SymbolTable::new(),
             flags: VisitorFlags::empty(),
             import_resolver_cfg,
+            import_resolver_cache: ImportResolverCache::default(),
         }
     }
 
@@ -474,6 +476,7 @@ where
                     &descriptor,
                     self.import_resolver_cfg.config,
                     self.import_resolver_cfg.host,
+                    &mut self.import_resolver_cache,
                 );
                 let is_thirdparty = matches!(
                     import_result.import_type,
@@ -625,6 +628,7 @@ where
                         &descriptor,
                         self.import_resolver_cfg.config,
                         self.import_resolver_cfg.host,
+                        &mut self.import_resolver_cache,
                     );
                     let is_thirdparty = matches!(
                         import_result.import_type,
