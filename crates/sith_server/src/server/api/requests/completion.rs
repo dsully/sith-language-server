@@ -38,12 +38,31 @@ use crate::{
 pub(super) mod resolve;
 
 #[derive(Debug)]
-enum PositionCtx<'node> {
+struct PositionCtx<'a> {
+    scope: ScopeId,
+    kind: PositionCtxKind<'a>,
+}
+
+impl<'a> PositionCtx<'a> {
+    fn new(scope: ScopeId, kind: PositionCtxKind<'a>) -> Self {
+        Self { scope, kind }
+    }
+
+    fn module() -> Self {
+        Self {
+            scope: ScopeId::global(),
+            kind: PositionCtxKind::Module,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum PositionCtxKind<'node> {
     Module,
-    Class(ScopeId),
-    Function(ScopeId),
+    Class,
+    Function,
     ParameterName,
-    TypeParamAnnotation(ScopeId),
+    TypeParamAnnotation,
     Import {
         has_segments: bool,
         /// All import segments before the text cursor
@@ -58,7 +77,7 @@ enum PositionCtx<'node> {
         level: u32,
         last_segment: Option<&'node str>,
     },
-    AttrAccess(&'node Expr, ScopeId),
+    AttrAccess(ResolvedType),
     Call {
         file_id: FileId,
         node_id: NodeId,
@@ -224,7 +243,7 @@ fn position_context<'nodes>(
     // might be requesting completion on a blank line.
     let Some(node) = node_at_offset(nodes, offset).or_else(|| node_at_row(nodes, offset, index))
     else {
-        return PositionCtx::Module;
+        return PositionCtx::module();
     };
 
     node_position_ctx(node, db, path, scope_id, nodes, offset)
@@ -249,7 +268,7 @@ fn node_position_ctx<'nodes>(
                 unreachable!()
             };
 
-            PositionCtx::Class(declaration.body_scope().unwrap())
+            PositionCtx::new(declaration.body_scope().unwrap(), PositionCtxKind::Class)
         }
         AnyNodeRef::StmtFunctionDef(ast::FunctionDefStmt { name, .. }) => {
             let Some(declaration) = db.symbol_declaration(
@@ -261,16 +280,23 @@ fn node_position_ctx<'nodes>(
                 unreachable!()
             };
 
-            PositionCtx::Function(declaration.body_scope().unwrap())
+            PositionCtx::new(declaration.body_scope().unwrap(), PositionCtxKind::Function)
         }
         AnyNodeRef::AttributeExpr(ast::AttributeExpr { value, .. }) => {
             let (scope_id, _) = db.find_enclosing_scope(path, offset);
-            PositionCtx::AttrAccess(value, scope_id)
+            let mut type_inferer = TypeInferer::new(db, scope_id, path.clone());
+            PositionCtx::new(
+                scope_id,
+                PositionCtxKind::AttrAccess(type_inferer.infer_expr(value.as_ref(), nodes)),
+            )
         }
-        AnyNodeRef::StmtImport(_) => PositionCtx::Import {
-            has_segments: false,
-            prev_segments: vec![],
-        },
+        AnyNodeRef::StmtImport(_) => PositionCtx::new(
+            scope_id,
+            PositionCtxKind::Import {
+                has_segments: false,
+                prev_segments: vec![],
+            },
+        ),
         AnyNodeRef::Alias(ast::Alias { name, .. }) => {
             let Some(parent_node) = node.parent_id().and_then(|id| nodes.get(id)) else {
                 unreachable!()
@@ -291,16 +317,24 @@ fn node_position_ctx<'nodes>(
                         }
                     }
 
-                    PositionCtx::Import {
-                        has_segments: name.contains('.'),
-                        prev_segments,
-                    }
+                    PositionCtx::new(
+                        scope_id,
+                        PositionCtxKind::Import {
+                            has_segments: name.contains('.'),
+                            prev_segments,
+                        },
+                    )
                 }
                 AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { level, module, .. }) => {
-                    PositionCtx::ImportFromName {
-                        level: *level,
-                        last_segment: module.as_ref().and_then(|module| module.split(".").last()),
-                    }
+                    PositionCtx::new(
+                        scope_id,
+                        PositionCtxKind::ImportFromName {
+                            level: *level,
+                            last_segment: module
+                                .as_ref()
+                                .and_then(|module| module.split(".").last()),
+                        },
+                    )
                 }
                 _ => unreachable!(),
             }
@@ -317,10 +351,13 @@ fn node_position_ctx<'nodes>(
             if offset as usize
                 > *level as usize + module.as_ref().map(|m| m.len()).unwrap_or(0) + 10 =>
         {
-            PositionCtx::ImportFromName {
-                level: *level,
-                last_segment: module.as_ref().and_then(|module| module.split(".").last()),
-            }
+            PositionCtx::new(
+                scope_id,
+                PositionCtxKind::ImportFromName {
+                    level: *level,
+                    last_segment: module.as_ref().and_then(|module| module.split(".").last()),
+                },
+            )
         }
         AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { module, level, .. }) => {
             let mut prev_segments = Vec::new();
@@ -335,25 +372,28 @@ fn node_position_ctx<'nodes>(
                 }
             }
 
-            PositionCtx::ImportFromSegment {
-                level: *level,
-                prev_segments,
-            }
+            PositionCtx::new(
+                scope_id,
+                PositionCtxKind::ImportFromSegment {
+                    level: *level,
+                    prev_segments,
+                },
+            )
         }
         AnyNodeRef::Parameters(ast::Parameters { args, .. })
             if args
                 .iter()
                 .any(|pwd| is_in_type_param_annotation(offset, &pwd.parameter)) =>
         {
-            PositionCtx::TypeParamAnnotation(scope_id)
+            PositionCtx::new(scope_id, PositionCtxKind::TypeParamAnnotation)
         }
         AnyNodeRef::Parameter(param) if is_in_type_param_annotation(offset, param) => {
-            PositionCtx::TypeParamAnnotation(scope_id)
+            PositionCtx::new(scope_id, PositionCtxKind::TypeParamAnnotation)
         }
-        AnyNodeRef::Parameter(_) => PositionCtx::ParameterName,
+        AnyNodeRef::Parameter(_) => PositionCtx::new(scope_id, PositionCtxKind::ParameterName),
         AnyNodeRef::NameExpr(_) => {
             let Some(parent_node) = node.parent_id().and_then(|node_id| nodes.get(node_id)) else {
-                return PositionCtx::Module;
+                return PositionCtx::module();
             };
 
             match parent_node.node() {
@@ -362,7 +402,7 @@ fn node_position_ctx<'nodes>(
                         .parent_id()
                         .and_then(|node_id| nodes.get(node_id))
                     else {
-                        return PositionCtx::Module;
+                        return PositionCtx::module();
                     };
                     node_position_ctx(granparent_node, db, path, scope_id, nodes, offset)
                 }
@@ -372,11 +412,13 @@ fn node_position_ctx<'nodes>(
         AnyNodeRef::CallExpr(ast::CallExpr { func, .. }) => {
             get_call_expr_position_ctx(func, db, path, scope_id, nodes)
         }
-        AnyNodeRef::FStringExpressionElement(_) => PositionCtx::FString,
-        AnyNodeRef::StringLiteralExpr(_) | AnyNodeRef::FStringLiteralElement(_) => {
-            PositionCtx::String
+        AnyNodeRef::FStringExpressionElement(_) => {
+            PositionCtx::new(scope_id, PositionCtxKind::FString)
         }
-        _ => PositionCtx::Module,
+        AnyNodeRef::StringLiteralExpr(_) | AnyNodeRef::FStringLiteralElement(_) => {
+            PositionCtx::new(scope_id, PositionCtxKind::String)
+        }
+        _ => PositionCtx::module(),
     }
 }
 
@@ -400,20 +442,23 @@ fn get_call_expr_position_ctx<'nodes>(
     match type_inferer.infer_expr(func, nodes) {
         ResolvedType::KnownType(PythonType::Class(class)) => {
             let Some((_, symbol)) = class.lookup(db, "__init__") else {
-                return PositionCtx::Module;
+                return PositionCtx::module();
             };
             let class_file = db.indexer().file_path(&class.file_id);
             // TODO: handle multiple constructors
             let declaration = db.declaration(class_file, symbol.declarations().first());
-            PositionCtx::Call {
-                file_id: class.file_id,
-                node_id: declaration.node_id,
-            }
+            PositionCtx::new(
+                scope_id,
+                PositionCtxKind::Call {
+                    file_id: class.file_id,
+                    node_id: declaration.node_id,
+                },
+            )
         }
         ResolvedType::KnownType(PythonType::Function {
             file_id, node_id, ..
-        }) => PositionCtx::Call { file_id, node_id },
-        _ => PositionCtx::Module,
+        }) => PositionCtx::new(scope_id, PositionCtxKind::Call { file_id, node_id }),
+        _ => PositionCtx::module(),
     }
 }
 
@@ -557,30 +602,29 @@ fn get_completion_candidates(
     db: &SymbolTableDb,
     pos_ctx: PositionCtx,
     path: &Arc<PathBuf>,
-    nodes: &Nodes,
     scope: ScopeId,
 ) -> Option<Vec<CompletionItem>> {
     let mut completion_candidates = FxHashSet::default();
 
-    if matches!(pos_ctx, PositionCtx::String) {
+    if matches!(pos_ctx.kind, PositionCtxKind::String) {
         return None;
     }
 
     // Don't show the bultin symbols in the following contexts
     if !matches!(
-        pos_ctx,
-        PositionCtx::Import { .. }
-            | PositionCtx::ImportFromName { .. }
-            | PositionCtx::ImportFromSegment { .. }
-            | PositionCtx::AttrAccess(_, _)
+        pos_ctx.kind,
+        PositionCtxKind::Import { .. }
+            | PositionCtxKind::ImportFromName { .. }
+            | PositionCtxKind::ImportFromSegment { .. }
+            | PositionCtxKind::AttrAccess(_)
     ) {
         completion_candidates.extend(builtin_completion_candidates(db));
     }
 
     // Whether to show the keywords
     if matches!(
-        pos_ctx,
-        PositionCtx::Module | PositionCtx::Class(_) | PositionCtx::Function(_)
+        pos_ctx.kind,
+        PositionCtxKind::Module | PositionCtxKind::Class | PositionCtxKind::Function
     ) {
         completion_candidates.extend(
             BUILTIN_KEYWORDS
@@ -589,24 +633,23 @@ fn get_completion_candidates(
         );
     }
 
-    match &pos_ctx {
-        PositionCtx::Module => {
+    match pos_ctx.kind {
+        PositionCtxKind::Module => {
             completion_candidates.extend(get_completion_candidates_from_scope(
                 db,
                 path,
                 db.global_scope(path),
             ));
         }
-        PositionCtx::FString => {
-            // TODO: get the completion candidates of the enclosing scope
-            completion_candidates.extend(get_completion_candidates_from_scope(
+        PositionCtxKind::FString => {
+            completion_candidates.extend(get_completion_candidates_from_scope_and_parents(
                 db,
                 path,
-                db.global_scope(path),
+                db.scope(path, pos_ctx.scope),
             ));
         }
-        PositionCtx::TypeParamAnnotation(enclosing_scope) => {
-            let scope = db.scope(path, *enclosing_scope);
+        PositionCtxKind::TypeParamAnnotation => {
+            let scope = db.scope(path, pos_ctx.scope);
             // add the symbols from the parent scope until it reaches the global scope
             for parent_scope in scope.parent_scopes(db, path) {
                 completion_candidates.extend(get_completion_candidates_from_scope(
@@ -616,17 +659,17 @@ fn get_completion_candidates(
                 ));
             }
         }
-        PositionCtx::Function(body_scope) | PositionCtx::Class(body_scope) => {
-            let func_scope = db.scope(path, *body_scope);
+        PositionCtxKind::Function | PositionCtxKind::Class => {
+            let func_scope = db.scope(path, pos_ctx.scope);
             completion_candidates.extend(get_completion_candidates_from_scope_and_parents(
                 db, path, func_scope,
             ));
         }
-        PositionCtx::Import {
+        PositionCtxKind::Import {
             has_segments,
             prev_segments,
         } => {
-            if *has_segments {
+            if has_segments {
                 let last_segment = prev_segments.last().unwrap();
                 let declaration =
                     db.symbol_declaration(path, last_segment, scope, DeclarationQuery::Last)?;
@@ -639,15 +682,15 @@ fn get_completion_candidates(
                     .extend(get_python_module_candidates(db.indexer().root_path()));
             }
         }
-        PositionCtx::ImportFromSegment {
+        PositionCtxKind::ImportFromSegment {
             level,
             prev_segments,
         } => {
             // The text cursor is in one of these cases:
             // Ex) Relative import: `from .foo.bar<cursor>` or `from .<cursor>`
-            if *level > 0 {
+            if level > 0 {
                 let mut parent_dir = Path::new("");
-                for _ in 0..*level {
+                for _ in 0..level {
                     let Some(path) = path.parent() else {
                         break;
                     };
@@ -678,15 +721,15 @@ fn get_completion_candidates(
                 completion_candidates.extend(get_thirdparty_and_builtin_modules_candidates(db));
             }
         }
-        PositionCtx::ImportFromName {
+        PositionCtxKind::ImportFromName {
             level,
             last_segment,
         } => {
             // Handles relative imports:
             // Ex) `from . import foo<cursor>` or `from .foo import bar<cursor>`
-            if last_segment.is_none() && *level > 0 {
+            if last_segment.is_none() && level > 0 {
                 let mut parent_dir = Path::new("");
-                for _ in 0..*level {
+                for _ in 0..level {
                     let Some(path) = path.parent() else {
                         break;
                     };
@@ -728,12 +771,12 @@ fn get_completion_candidates(
                 completion_candidates.extend(get_python_module_candidates(parent_dir));
             }
         }
-        PositionCtx::Call { file_id, node_id } => {
-            let path = db.indexer().file_path(file_id);
+        PositionCtxKind::Call { file_id, node_id } => {
+            let path = db.indexer().file_path(&file_id);
             let node_stack = db.indexer().node_stack(path);
             let Some(func_stmt) = node_stack
                 .nodes()
-                .get(*node_id)
+                .get(node_id)
                 .and_then(|node| node.as_stmt_function_def())
             else {
                 unreachable!()
@@ -752,40 +795,37 @@ fn get_completion_candidates(
                 db, path, scope,
             ));
         }
-        PositionCtx::AttrAccess(expr, scope_id) => {
-            let mut type_inferer = TypeInferer::new(db, *scope_id, path.clone());
-            match type_inferer.infer_expr(*expr, nodes) {
-                ResolvedType::KnownType(PythonType::Class(class)) => match compute_mro(db, class) {
-                    Ok(class_bases) => {
-                        for class_base in class_bases
-                            .into_iter()
-                            .filter_map(|class_base| class_base.into_class())
-                        {
-                            let class_path = db.indexer().file_path(&class_base.file_id);
-                            let body_scope = db.scope(class_path, class_base.body_scope);
-                            completion_candidates.extend(get_completion_candidates_from_scope(
-                                db, class_path, body_scope,
-                            ));
-                        }
+        PositionCtxKind::AttrAccess(resolved_type) => match resolved_type {
+            ResolvedType::KnownType(PythonType::Class(class)) => match compute_mro(db, class) {
+                Ok(class_bases) => {
+                    for class_base in class_bases
+                        .into_iter()
+                        .filter_map(|class_base| class_base.into_class())
+                    {
+                        let class_path = db.indexer().file_path(&class_base.file_id);
+                        let body_scope = db.scope(class_path, class_base.body_scope);
+                        completion_candidates.extend(get_completion_candidates_from_scope(
+                            db, class_path, body_scope,
+                        ));
                     }
-                    Err(err_msg) => {
-                        let path = db.indexer().file_path(&class.file_id);
-                        tracing::error!(
-                            "Failed to compute MRO of class ('{}'): {err_msg}",
-                            db.symbol_name(path, class.symbol_id)
-                        );
-                    }
-                },
-                ResolvedType::KnownType(PythonType::Module(import_source)) => {
-                    let module_path = import_source.any_path()?;
-                    let scope = db.scope(module_path, ScopeId::global());
-
-                    completion_candidates =
-                        get_completion_candidates_from_scope(db, module_path, scope).collect();
                 }
-                _ => return None,
+                Err(err_msg) => {
+                    let path = db.indexer().file_path(&class.file_id);
+                    tracing::error!(
+                        "Failed to compute MRO of class ('{}'): {err_msg}",
+                        db.symbol_name(path, class.symbol_id)
+                    );
+                }
+            },
+            ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                let module_path = import_source.any_path()?;
+                let scope = db.scope(module_path, ScopeId::global());
+
+                completion_candidates =
+                    get_completion_candidates_from_scope(db, module_path, scope).collect();
             }
-        }
+            _ => return None,
+        },
         _ => return None,
     };
 
@@ -845,9 +885,7 @@ impl super::BackgroundDocumentRequestHandler for Completion {
         let (scope, _) = db.find_enclosing_scope(&path, offset);
         let pos_ctx = position_context(db, &path, scope, node_stack.nodes(), offset, index);
 
-        Ok(
-            get_completion_candidates(db, pos_ctx, &path, node_stack.nodes(), scope)
-                .map(types::CompletionResponse::Array),
-        )
+        Ok(get_completion_candidates(db, pos_ctx, &path, scope)
+            .map(types::CompletionResponse::Array))
     }
 }
