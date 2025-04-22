@@ -17,8 +17,9 @@ use serde::{Deserialize, Serialize};
 use sith_python_ast::{self as ast, AnyNodeRef, Expr};
 use sith_python_ast_utils::{
     node_at_offset, node_at_row,
-    nodes::{NodeId, NodeWithParent, Nodes},
+    nodes::{NodeId, NodeStack, NodeWithParent, Nodes},
 };
+use sith_python_parser::{TokenKind, Tokens};
 use sith_python_utils::get_python_module_names_in_path;
 use sith_semantic_model::{
     builtins::BUILTIN_KEYWORDS,
@@ -235,6 +236,7 @@ fn position_context<'nodes>(
     db: &SymbolTableDb,
     path: &Arc<PathBuf>,
     scope_id: ScopeId,
+    tokens: &Tokens,
     nodes: &'nodes Nodes,
     offset: u32,
     index: &LineIndex,
@@ -246,7 +248,7 @@ fn position_context<'nodes>(
         return PositionCtx::module();
     };
 
-    node_position_ctx(node, db, path, scope_id, nodes, offset)
+    node_position_ctx(node, db, path, scope_id, tokens, nodes, offset)
 }
 
 fn node_position_ctx<'nodes>(
@@ -254,6 +256,7 @@ fn node_position_ctx<'nodes>(
     db: &SymbolTableDb,
     path: &Arc<PathBuf>,
     scope_id: ScopeId,
+    tokens: &Tokens,
     nodes: &'nodes Nodes,
     offset: u32,
 ) -> PositionCtx<'nodes> {
@@ -339,46 +342,60 @@ fn node_position_ctx<'nodes>(
                 _ => unreachable!(),
             }
         }
-        // Handles the case were we have the text cursor right after the `import` keyword
-        // in `from foo import |` (| is the cursor). Without this the `PositionCtx` returned
-        // would be `PositionCtx::ImportFromSegment` which is incorrect.
-        //
-        // The calculation for the cursor offset is:
-        // - level: counts the number of dots in relative imports (e.g., `from .. import` has level 2)
-        // - module length: length of the module path if present (e.g., "foo" or "foo.bar")
-        // - 10: combined length of "from" (4) + "import" (6) keywords `.
-        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { module, level, .. })
-            if offset as usize
-                > *level as usize + module.as_ref().map(|m| m.len()).unwrap_or(0) + 10 =>
-        {
-            PositionCtx::new(
-                scope_id,
-                PositionCtxKind::ImportFromName {
-                    level: *level,
-                    last_segment: module.as_ref().and_then(|module| module.split(".").last()),
-                },
-            )
-        }
-        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt { module, level, .. }) => {
-            let mut prev_segments = Vec::new();
-            if let Some(module) = module {
-                let module_start = module.range.start().to_usize();
-                let mut position = 0;
-                for segment in module.split('.').filter(|s| !s.is_empty()) {
-                    position += segment.len() + 1;
-                    if module_start + position <= offset as usize {
-                        prev_segments.push(segment);
+        AnyNodeRef::StmtImportFrom(ast::ImportFromStmt {
+            module,
+            level,
+            range,
+            ..
+        }) => {
+            let mut is_cursor_after_import = false;
+            for token in tokens
+                .iter()
+                .filter(|token| range.contains_range(token.range()))
+            {
+                match token.kind() {
+                    TokenKind::Newline => break,
+                    TokenKind::Import if offset > token.range().end().to_u32() => {
+                        is_cursor_after_import = true
                     }
+                    _ => {}
                 }
             }
 
-            PositionCtx::new(
-                scope_id,
-                PositionCtxKind::ImportFromSegment {
-                    level: *level,
-                    prev_segments,
-                },
-            )
+            // Handles the case where the text cursor is after the `import` keyword, e.g.
+            // `from foo import <cursor>`.
+            if is_cursor_after_import {
+                PositionCtx::new(
+                    scope_id,
+                    PositionCtxKind::ImportFromName {
+                        level: *level,
+                        last_segment: module.as_ref().and_then(|module| module.split(".").last()),
+                    },
+                )
+            }
+            // Handles the case where the text cursor is after an import segment, e.g.
+            // `from foo.<cursor>`
+            else {
+                let mut prev_segments = Vec::new();
+                if let Some(module) = module {
+                    let module_start = module.range.start().to_usize();
+                    let mut position = 0;
+                    for segment in module.split('.').filter(|s| !s.is_empty()) {
+                        position += segment.len() + 1;
+                        if module_start + position <= offset as usize {
+                            prev_segments.push(segment);
+                        }
+                    }
+                }
+
+                PositionCtx::new(
+                    scope_id,
+                    PositionCtxKind::ImportFromSegment {
+                        level: *level,
+                        prev_segments,
+                    },
+                )
+            }
         }
         AnyNodeRef::Parameters(ast::Parameters { args, .. })
             if args
@@ -404,9 +421,9 @@ fn node_position_ctx<'nodes>(
                     else {
                         return PositionCtx::module();
                     };
-                    node_position_ctx(granparent_node, db, path, scope_id, nodes, offset)
+                    node_position_ctx(granparent_node, db, path, scope_id, tokens, nodes, offset)
                 }
-                _ => node_position_ctx(parent_node, db, path, scope_id, nodes, offset),
+                _ => node_position_ctx(parent_node, db, path, scope_id, tokens, nodes, offset),
             }
         }
         AnyNodeRef::CallExpr(ast::CallExpr { func, .. }) => {
@@ -736,39 +753,23 @@ fn get_completion_candidates(
                     parent_dir = path;
                 }
 
-                // TODO: refactor this to avoid creating a `CompletionItem` here
-                return Some(
-                    get_python_module_candidates(parent_dir)
-                        .into_iter()
-                        .map(|completion_item_candidate| CompletionItem {
-                            sort_text: Some(completion_item_candidate.sort_text()),
-                            label: completion_item_candidate.label.to_string(),
-                            kind: Some(completion_item_candidate.kind),
-                            data: Some(
-                                serde_json::to_value(CompletionItemData {
-                                    document_uri: path.to_path_buf(),
-                                    payload: completion_item_candidate.data,
-                                })
-                                .expect("no error when serializing completion item data!"),
-                            ),
-                            ..Default::default()
-                        })
-                        .collect(),
-                );
+                completion_candidates = get_python_module_candidates(parent_dir);
             }
-
             // Handles absolute imports:
             // Ex) `from foo import bar<cursor>`
-            let last_seg = last_segment.unwrap();
-            let declaration =
-                db.symbol_declaration(path, last_seg, scope, DeclarationQuery::Last)?;
-            let source = declaration.import_source()?.any_path()?;
-            completion_candidates =
-                get_completion_candidates_from_scope(db, source, db.global_scope(source)).collect();
+            else {
+                let last_seg = last_segment.unwrap();
+                let declaration =
+                    db.symbol_declaration(path, last_seg, scope, DeclarationQuery::Last)?;
+                let source = declaration.import_source()?.any_path()?;
+                completion_candidates =
+                    get_completion_candidates_from_scope(db, source, db.global_scope(source))
+                        .collect();
 
-            if source.ends_with("__init__.py") || source.ends_with("__init__.pyi") {
-                let parent_dir = source.parent().unwrap();
-                completion_candidates.extend(get_python_module_candidates(parent_dir));
+                if source.ends_with("__init__.py") || source.ends_with("__init__.pyi") {
+                    let parent_dir = source.parent().unwrap();
+                    completion_candidates.extend(get_python_module_candidates(parent_dir));
+                }
             }
         }
         PositionCtxKind::Call { file_id, node_id } => {
@@ -880,10 +881,19 @@ impl super::BackgroundDocumentRequestHandler for Completion {
         let position = params.text_document_position.position;
         let offset = position_to_offset(document.contents(), &position, index);
 
-        let node_stack = db.indexer().node_stack(&path);
+        let parsed_file = db.indexer().ast_or_panic(&path);
+        let node_stack = NodeStack::default().build(parsed_file.suite());
 
         let (scope, _) = db.find_enclosing_scope(&path, offset);
-        let pos_ctx = position_context(db, &path, scope, node_stack.nodes(), offset, index);
+        let pos_ctx = position_context(
+            db,
+            &path,
+            scope,
+            parsed_file.tokens(),
+            node_stack.nodes(),
+            offset,
+            index,
+        );
 
         Ok(get_completion_candidates(db, pos_ctx, &path, scope)
             .map(types::CompletionResponse::Array))
