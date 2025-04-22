@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, ReadDir},
+    fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::LazyLock,
@@ -154,17 +154,28 @@ pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<(String, P
         if file_type.is_dir() {
             let sub_path = entry.path();
             let init_file = sub_path.join("__init__.py");
+            let init_file_pyi = sub_path.join("__init__.pyi");
 
             if init_file.exists() {
                 if let Some(dir_name) = sub_path.file_name().and_then(|name| name.to_str()) {
                     names.push((dir_name.to_string(), init_file));
                 }
+            } else if init_file_pyi.exists() {
+                if let Some(dir_name) = sub_path.file_name().and_then(|name| name.to_str()) {
+                    names.push((dir_name.to_string(), init_file_pyi));
+                }
             }
         } else if file_type.is_file() {
             let path = entry.path();
-            if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
-                if file_name.ends_with(".py") && file_name != "__init__.py" {
-                    names.push((file_name.trim_end_matches(".py").to_string(), path));
+            if path.ends_with("__init__.py") || path.ends_with("__init__.pyi") {
+                continue;
+            }
+            if let Some(ext) = path.extension() {
+                let file_name = path.file_name().unwrap().to_string_lossy();
+                match ext.to_string_lossy().as_bytes() {
+                    b"py" => names.push((file_name.trim_end_matches(".py").to_string(), path)),
+                    b"pyi" => names.push((file_name.trim_end_matches(".pyi").to_string(), path)),
+                    _ => {}
                 }
             }
         }
