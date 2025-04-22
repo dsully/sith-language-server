@@ -173,62 +173,6 @@ pub fn get_python_module_names_in_path(path: impl AsRef<Path>) -> Vec<(String, P
     names
 }
 
-fn is_hidden(entry: &fs::DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .is_some_and(|s| s.starts_with("."))
-}
-
-fn dirs_to_skip(entry: &fs::DirEntry) -> bool {
-    let path = entry.path();
-    is_hidden(entry) || path.ends_with("__pycache__") || path.ends_with("node_modules")
-}
-
-fn is_python_file(entry: &fs::DirEntry) -> bool {
-    let path = entry.path();
-    path.is_file() && path.extension().is_some_and(|ext| ext == "py")
-}
-
-fn contains_python_files_in_dir(entries: &mut ReadDir) -> bool {
-    entries.any(|e| e.is_ok_and(|e| is_python_file(&e)))
-}
-
-fn scan_dir_for_python_files(path: impl AsRef<Path>, paths: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(path) else {
-        return;
-    };
-
-    for entry in entries.filter_map(|e| e.ok()) {
-        if dirs_to_skip(&entry) {
-            continue;
-        }
-
-        if is_python_file(&entry) {
-            paths.push(entry.path())
-        }
-
-        if entry.file_type().is_ok_and(|e| e.is_dir()) {
-            let pathbuf = entry.path();
-            let Ok(mut sub_dir_entries) = fs::read_dir(&pathbuf) else {
-                continue;
-            };
-
-            if contains_python_files_in_dir(&mut sub_dir_entries) {
-                scan_dir_for_python_files(pathbuf, paths);
-            }
-        }
-    }
-}
-
-pub fn python_files_in_path(root: impl AsRef<Path>) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-
-    scan_dir_for_python_files(root, &mut files);
-
-    files
-}
-
 /// Checks if the symbol name correspond to the file path in the form `bar/__init__.py`
 /// or `foo/bar.py`.
 pub fn is_python_module(name: &str, path: &Path) -> bool {
