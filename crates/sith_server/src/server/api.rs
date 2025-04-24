@@ -4,6 +4,8 @@ use lsp_server as server;
 mod diagnostics;
 mod notifications;
 mod requests;
+#[cfg(test)]
+mod tests;
 mod traits;
 
 use notifications as notification;
