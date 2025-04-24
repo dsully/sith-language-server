@@ -38,7 +38,7 @@ impl super::BackgroundDocumentRequestHandler for SignatureHelp {
     }
 }
 
-fn signature_help(
+pub(crate) fn signature_help(
     snapshot: &DocumentSnapshot,
     params: types::SignatureHelpParams,
 ) -> Option<types::SignatureHelp> {

@@ -12,10 +12,10 @@ use sith_semantic_model::type_inference::TypeInferer;
 use sith_semantic_model::type_inference::{PythonType, ResolvedType};
 use sith_semantic_model::ScopeId;
 use sith_semantic_model::{self as sm, db::SymbolTableDb};
+use tracing::error;
 use types::GotoDefinitionResponse;
 
 use crate::edit::{position_to_offset, ToLocation};
-use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 
@@ -35,38 +35,36 @@ impl super::BackgroundDocumentRequestHandler for GotoDefinition {
         _: Notifier,
         params: types::GotoDefinitionParams,
     ) -> Result<Option<types::GotoDefinitionResponse>> {
-        let document_path = Arc::new(
-            snapshot
-                .url()
-                .to_file_path()
-                .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?,
-        );
-
-        let db = snapshot.db();
-        let node_stack = db.indexer().node_stack(&document_path);
-
-        let document = snapshot.document();
-
-        let position = params.text_document_position_params.position;
-        let offset = position_to_offset(document.contents(), &position, document.index());
-        let (scope, _) = db.find_enclosing_scope(&document_path, offset);
-
-        let Some((is_python_module, declaration_path, declaration)) =
-            find_declaration(db, &document_path, scope, offset, node_stack.nodes())
-        else {
-            return Ok(None);
-        };
-
-        let is_same_document = *declaration_path == *document_path;
-        create_location_response(
-            is_python_module,
-            is_same_document,
-            declaration_path,
-            declaration,
-            &snapshot,
-        )
+        Ok(goto_definition(snapshot, params))
     }
+}
+
+pub(crate) fn goto_definition(
+    snapshot: DocumentSnapshot,
+    params: types::GotoDefinitionParams,
+) -> Option<types::GotoDefinitionResponse> {
+    let document_path = Arc::new(snapshot.url().to_file_path().ok()?);
+
+    let db = snapshot.db();
+    let node_stack = db.indexer().node_stack(&document_path);
+
+    let document = snapshot.document();
+
+    let position = params.text_document_position_params.position;
+    let offset = position_to_offset(document.contents(), &position, document.index());
+    let (scope, _) = db.find_enclosing_scope(&document_path, offset);
+
+    let (is_python_module, declaration_path, declaration) =
+        find_declaration(db, &document_path, scope, offset, node_stack.nodes())?;
+
+    let is_same_document = *declaration_path == *document_path;
+    create_location_response(
+        is_python_module,
+        is_same_document,
+        declaration_path,
+        declaration,
+        &snapshot,
+    )
 }
 
 enum IsPythonModule {
@@ -173,29 +171,30 @@ fn create_location_response(
     path: &PathBuf,
     declaration: &Declaration,
     snapshot: &DocumentSnapshot,
-) -> Result<Option<types::GotoDefinitionResponse>> {
-    let url = Url::from_file_path(path.as_path())
-        .map_err(|_| anyhow::anyhow!("Failed to convert file path to URL"))
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+) -> Option<types::GotoDefinitionResponse> {
+    let url = Url::from_file_path(path.as_path()).ok()?;
     if matches!(is_python_module, IsPythonModule::Yes) {
-        return Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+        return Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
             uri: url,
             range: lsp_types::Range::default(),
-        })));
+        }));
     }
 
     let content = if is_same_document {
         snapshot.document().contents()
     } else {
         &sm::util::read_to_string(path)
-            .map_err(|e| anyhow::anyhow!("Failed to read {} contents: {e}", path.display()))
-            .with_failure_code(lsp_server::ErrorCode::RequestFailed)?
+            .map_err(|e| {
+                error!("Failed to read {} contents: {e}", path.display());
+                e
+            })
+            .ok()?
     };
     let index = LineIndex::from_source_text(content);
 
-    Ok(Some(GotoDefinitionResponse::Scalar(
+    Some(GotoDefinitionResponse::Scalar(
         declaration
             .range
             .to_location(url, content, &index, snapshot.encoding()),
-    )))
+    ))
 }

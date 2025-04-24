@@ -27,23 +27,29 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         _notifier: Notifier,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
-        let mut response = types::CodeActionResponse::default();
-
-        let supported_code_actions = supported_code_actions(params.context.only.clone());
-        if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
-            let fixes = fixes_for_diagnostics(params.context.diagnostics)
-                .with_failure_code(ErrorCode::InternalError)?;
-            response
-                .extend(quick_fix(&snapshot, fixes).with_failure_code(ErrorCode::InternalError)?);
-        }
-        if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
-            response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
-        }
-        if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
-            response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
-        }
-        Ok(Some(response))
+        code_action(snapshot, params)
     }
+}
+
+pub(crate) fn code_action(
+    snapshot: DocumentSnapshot,
+    params: types::CodeActionParams,
+) -> Result<Option<types::CodeActionResponse>> {
+    let mut response = types::CodeActionResponse::default();
+
+    let supported_code_actions = supported_code_actions(params.context.only.clone());
+    if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
+        let fixes = fixes_for_diagnostics(params.context.diagnostics)
+            .with_failure_code(ErrorCode::InternalError)?;
+        response.extend(quick_fix(&snapshot, fixes).with_failure_code(ErrorCode::InternalError)?);
+    }
+    if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
+        response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+    }
+    if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
+        response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+    }
+    Ok(Some(response))
 }
 
 fn quick_fix(

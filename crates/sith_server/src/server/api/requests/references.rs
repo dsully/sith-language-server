@@ -49,7 +49,7 @@ impl super::BackgroundDocumentRequestHandler for References {
     }
 }
 
-fn references(
+pub(crate) fn references(
     snapshot: &DocumentSnapshot,
     params: types::ReferenceParams,
 ) -> Option<Vec<Location>> {

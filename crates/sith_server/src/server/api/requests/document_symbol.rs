@@ -2,9 +2,9 @@ use lsp_types::{
     self as types, request as req, DocumentSymbolResponse, Location, SymbolInformation, SymbolKind,
     SymbolTag, Url,
 };
-use sith_python_ast_utils::is_class_or_function_deprecated;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
+use sith_python_ast_utils::is_class_or_function_deprecated;
 use sith_semantic_model::declaration::{DeclStmt, Declaration, DeclarationKind};
 use sith_semantic_model::{ScopeId, ScopeKind, Symbol};
 
@@ -30,7 +30,7 @@ impl super::BackgroundDocumentRequestHandler for DocumentSymbol {
     }
 }
 
-fn document_symbol(
+pub(crate) fn document_symbol(
     snapshot: &DocumentSnapshot,
     params: &types::DocumentSymbolParams,
 ) -> Option<DocumentSymbolResponse> {

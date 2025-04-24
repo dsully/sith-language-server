@@ -32,7 +32,7 @@ use sith_semantic_model::{
 
 use crate::{
     edit::position_to_offset,
-    server::{api::LSPResult, client::Notifier, Result},
+    server::{client::Notifier, Result},
     session::DocumentSnapshot,
 };
 
@@ -866,36 +866,36 @@ impl super::BackgroundDocumentRequestHandler for Completion {
         _: Notifier,
         params: types::CompletionParams,
     ) -> Result<Option<types::CompletionResponse>> {
-        let path = Arc::new(
-            snapshot
-                .url()
-                .to_file_path()
-                .map_err(|_| anyhow::anyhow!("Failed to convert URL to file path"))
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?,
-        );
-
-        let db = snapshot.db();
-        let document = snapshot.document();
-
-        let index = document.index();
-        let position = params.text_document_position.position;
-        let offset = position_to_offset(document.contents(), &position, index);
-
-        let parsed_file = db.indexer().ast_or_panic(&path);
-        let node_stack = NodeStack::default().build(parsed_file.suite());
-
-        let (scope, _) = db.find_enclosing_scope(&path, offset);
-        let pos_ctx = position_context(
-            db,
-            &path,
-            scope,
-            parsed_file.tokens(),
-            node_stack.nodes(),
-            offset,
-            index,
-        );
-
-        Ok(get_completion_candidates(db, pos_ctx, &path, scope)
-            .map(types::CompletionResponse::Array))
+        Ok(completion(snapshot, params))
     }
+}
+
+pub(crate) fn completion(
+    snapshot: DocumentSnapshot,
+    params: types::CompletionParams,
+) -> Option<types::CompletionResponse> {
+    let path = Arc::new(snapshot.url().to_file_path().ok()?);
+
+    let db = snapshot.db();
+    let document = snapshot.document();
+
+    let index = document.index();
+    let position = params.text_document_position.position;
+    let offset = position_to_offset(document.contents(), &position, index);
+
+    let parsed_file = db.indexer().ast_or_panic(&path);
+    let node_stack = NodeStack::default().build(parsed_file.suite());
+
+    let (scope, _) = db.find_enclosing_scope(&path, offset);
+    let pos_ctx = position_context(
+        db,
+        &path,
+        scope,
+        parsed_file.tokens(),
+        node_stack.nodes(),
+        offset,
+        index,
+    );
+
+    get_completion_candidates(db, pos_ctx, &path, scope).map(types::CompletionResponse::Array)
 }

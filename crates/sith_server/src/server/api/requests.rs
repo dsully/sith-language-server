@@ -1,17 +1,17 @@
-mod code_action;
-mod code_action_resolve;
-mod completion;
-mod diagnostic;
-mod document_highlight;
-mod document_symbol;
-mod execute_command;
-mod format;
-mod goto_definition;
-mod hover;
-mod prepare_rename;
-mod references;
-mod rename;
-mod signature_help;
+pub(super) mod code_action;
+pub(super) mod code_action_resolve;
+pub(super) mod completion;
+pub(super) mod diagnostic;
+pub(super) mod document_highlight;
+pub(super) mod document_symbol;
+pub(super) mod execute_command;
+pub(super) mod format;
+pub(super) mod goto_definition;
+pub(super) mod hover;
+pub(super) mod prepare_rename;
+pub(super) mod references;
+pub(super) mod rename;
+pub(super) mod signature_help;
 
 use super::{
     define_document_url,

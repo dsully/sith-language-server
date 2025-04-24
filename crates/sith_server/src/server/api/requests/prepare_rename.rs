@@ -27,7 +27,7 @@ impl super::BackgroundDocumentRequestHandler for PrepareRename {
     }
 }
 
-fn prepare_rename(
+pub(crate) fn prepare_rename(
     snapshot: &DocumentSnapshot,
     params: types::TextDocumentPositionParams,
 ) -> Option<types::PrepareRenameResponse> {

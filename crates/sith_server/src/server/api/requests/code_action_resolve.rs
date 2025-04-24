@@ -27,43 +27,50 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         _notifier: Notifier,
-        mut action: types::CodeAction,
+        action: types::CodeAction,
     ) -> Result<types::CodeAction> {
-        let code_actions = SupportedCodeAction::from_kind(
-            action
-                .kind
-                .clone()
-                .ok_or(anyhow::anyhow!("No kind was given for code action"))
-                .with_failure_code(ErrorCode::InvalidParams)?,
-        )
-        .collect::<Vec<_>>();
-
-        // Ensure that the code action maps to _exactly one_ supported code action
-        let [action_kind] = code_actions.as_slice() else {
-            return Err(anyhow::anyhow!(
-                "Code action resolver did not expect code action kind {:?}",
-                action.kind.as_ref().unwrap()
-            ))
-            .with_failure_code(ErrorCode::InvalidParams);
-        };
-
-        action.edit = match action_kind {
-            SupportedCodeAction::SourceOrganizeImports => Some(
-                resolve_edit_for_organize_imports(&snapshot)
-                    .with_failure_code(ErrorCode::InternalError)?,
-            ),
-            SupportedCodeAction::SourceFixAll => Some(
-                resolve_edit_for_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?,
-            ),
-            SupportedCodeAction::QuickFix => {
-                // The client may ask us to resolve a code action, as it has no way of knowing
-                // whether e.g. `command` field will be filled out by the resolution callback.
-                return Ok(action);
-            }
-        };
-
-        Ok(action)
+        code_action_resolve(snapshot, action)
     }
+}
+
+pub(crate) fn code_action_resolve(
+    snapshot: DocumentSnapshot,
+    mut action: types::CodeAction,
+) -> Result<types::CodeAction> {
+    let code_actions = SupportedCodeAction::from_kind(
+        action
+            .kind
+            .clone()
+            .ok_or(anyhow::anyhow!("No kind was given for code action"))
+            .with_failure_code(ErrorCode::InvalidParams)?,
+    )
+    .collect::<Vec<_>>();
+
+    // Ensure that the code action maps to _exactly one_ supported code action
+    let [action_kind] = code_actions.as_slice() else {
+        return Err(anyhow::anyhow!(
+            "Code action resolver did not expect code action kind {:?}",
+            action.kind.as_ref().unwrap()
+        ))
+        .with_failure_code(ErrorCode::InvalidParams);
+    };
+
+    action.edit = match action_kind {
+        SupportedCodeAction::SourceOrganizeImports => Some(
+            resolve_edit_for_organize_imports(&snapshot)
+                .with_failure_code(ErrorCode::InternalError)?,
+        ),
+        SupportedCodeAction::SourceFixAll => {
+            Some(resolve_edit_for_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?)
+        }
+        SupportedCodeAction::QuickFix => {
+            // The client may ask us to resolve a code action, as it has no way of knowing
+            // whether e.g. `command` field will be filled out by the resolution callback.
+            return Ok(action);
+        }
+    };
+
+    Ok(action)
 }
 
 pub(super) fn resolve_edit_for_fix_all(
