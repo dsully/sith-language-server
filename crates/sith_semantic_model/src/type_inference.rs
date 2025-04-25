@@ -745,6 +745,9 @@ impl<'db> TypeInferer<'db> {
 
                 self.infer_expr(value.as_ref(), nodes)
             }
+            AnyNodeRef::StmtAugAssign(ast::AugAssignStmt { value, .. }) => {
+                self.infer_expr(value.as_ref(), nodes)
+            }
             AnyNodeRef::StmtAnnAssign(ast::AnnAssignStmt {
                 annotation, value, ..
             }) => {
