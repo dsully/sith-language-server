@@ -18,7 +18,7 @@ use sith_semantic_model::{
     db::{FileId, SymbolTableDb},
     declaration::DeclarationQuery,
     symbol_table::SymbolTable,
-    type_inference::{ResolvedType, TypeInferer},
+    type_inference::{PythonType, ResolvedType, TypeInferer},
     ScopeId, ScopeKind,
 };
 use types::Location;
@@ -157,6 +157,48 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         if symbol_type == ResolvedType::Unknown {
             return FxHashMap::default();
         }
+        // This closure determines which files to include in the global reference search.
+        // It filters for files that import our target symbol from the current file,
+        // ensuring we only search in files that could potentially reference our symbol.
+        let mut check_import_source: Box<dyn Fn(&SymbolTable) -> bool> =
+            Box::new(|table: &SymbolTable| {
+                table
+                    .symbol_declaration(symbol_name, ScopeId::global(), DeclarationQuery::Last)
+                    .and_then(|decl| decl.import_source()?.any_path())
+                    .is_some_and(|import_path| import_path == self.current_file)
+            });
+
+        // For attribute expressions (obj.attr), handle the special case differently:
+        // 1. First infer the type of the base object ('obj')
+        // 2. Update our search strategy to find references based on the origin file of that type
+        // 3. Modify the target symbol name to look for the class/module name instead of the attribute
+        // This allows us to correctly find references to attributes across imported classes/modules
+        if let AnyNodeRef::AttributeExpr(attr) = symbol_node.node() {
+            let (origin_file, target_name) =
+                match type_inferer.infer_expr(attr.value.as_ref(), node_stack.nodes()) {
+                    ResolvedType::KnownType(PythonType::Class(class_type)) => {
+                        let origin_file = self.db.indexer().file_path(&class_type.file_id);
+                        let class_name = self.db.symbol_name(origin_file, class_type.symbol_id);
+                        (origin_file.clone(), class_name.to_string())
+                    }
+                    ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                        let Some(origin_file) = import_source.any_path() else {
+                            return FxHashMap::default();
+                        };
+                        let module_name_py = origin_file.file_name().unwrap().to_string_lossy();
+                        let module_name = module_name_py.split('.').nth(0).unwrap();
+                        (origin_file.clone(), module_name.to_string())
+                    }
+                    _ => unreachable!(),
+                };
+
+            check_import_source = Box::new(move |table: &SymbolTable| {
+                table
+                    .symbol_declaration(&target_name, ScopeId::global(), DeclarationQuery::Last)
+                    .and_then(|decl| decl.import_source()?.any_path())
+                    .is_some_and(|import_path| import_path == &origin_file)
+            });
+        }
 
         let current_file_id = self.db.indexer().file_id(self.current_file);
         let table = self.db.table(self.current_file);
@@ -179,6 +221,7 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
                     .scope(self.current_file, symbol.definition_scope())
                     .kind()
             });
+
         // Check if the symbol was defined locally to a scope and skip global search.
         if !is_symbol_part_of_attr
             && matches!(
@@ -195,28 +238,14 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
 
         // If the symbol we're trying to find the references for is imported we need to
         // search for references in the file where it was declared.
-        if let Some(import_source) = table
-            .symbol_declaration(symbol_name, scope_id, DeclarationQuery::First)
-            .and_then(|declaration| declaration.import_source())
-            .filter(|import_source| !import_source.is_unresolved())
-        {
-            let path = import_source.any_path().unwrap();
-            let suite = self.db.indexer().ast_or_panic(path).suite();
-            let node_stack = NodeStack::default().build(suite);
-            let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path.clone());
-            let references_visitor = ReferencesFinderVisitor::new(
-                self.db.table(path),
-                symbol_name,
-                &symbol_type,
-                type_inferer,
-                node_stack.nodes(),
-                include_declaration,
-            );
-            result.insert(
-                self.db.indexer().file_id(path),
-                references_visitor.find_references(suite),
-            );
-        }
+        self.find_references_in_origin(
+            symbol_name,
+            scope_id,
+            &symbol_type,
+            is_symbol_part_of_attr,
+            include_declaration,
+            &mut result,
+        );
 
         for (file_id, table) in self
             .db
@@ -224,15 +253,8 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
             .tables()
             // skip searching the current file for references
             .filter(|(file_id, _)| **file_id != current_file_id)
-            // only search files that import `symbol_name`; this check is ignored if `is_symbol_part_of_attr`
-            // is true.
-            .filter(|(_, table)| {
-                is_symbol_part_of_attr
-                    || table
-                        .symbol_declaration(symbol_name, ScopeId::global(), DeclarationQuery::Last)
-                        .and_then(|decl| decl.import_source()?.any_path())
-                        .is_some_and(|import_path| import_path == self.current_file)
-            })
+            // only search files that import `symbol_name`
+            .filter(|(_, table)| check_import_source(table))
         {
             let path = self.db.indexer().file_path(file_id);
             let suite = self.db.indexer().ast_or_panic(path).suite();
@@ -253,6 +275,59 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         }
 
         result
+    }
+
+    fn find_references_in_origin(
+        &self,
+        symbol_name: &str,
+        scope_id: ScopeId,
+        symbol_type: &ResolvedType,
+        is_symbol_part_of_attr: bool,
+        include_declaration: IncludeDeclaration,
+        result: &mut FxHashMap<FileId, Vec<TextRange>>,
+    ) {
+        let path = if is_symbol_part_of_attr {
+            let path = match &symbol_type {
+                ResolvedType::KnownType(PythonType::Function { file_id, .. }) => {
+                    self.db.indexer().file_path(file_id)
+                }
+                ResolvedType::KnownType(PythonType::Module(import_source)) => {
+                    import_source.any_path().unwrap()
+                }
+                _ => return,
+            };
+            path
+        } else if let Some(import_source) = self
+            .db
+            .symbol_declaration(
+                self.current_file,
+                symbol_name,
+                scope_id,
+                DeclarationQuery::First,
+            )
+            .and_then(|declaration| declaration.import_source())
+            .filter(|import_source| !import_source.is_unresolved())
+        {
+            import_source.any_path().unwrap()
+        } else {
+            return;
+        };
+
+        let suite = self.db.indexer().ast_or_panic(path).suite();
+        let node_stack = NodeStack::default().build(suite);
+        let type_inferer = TypeInferer::new(self.db, ScopeId::global(), path.clone());
+        let references_visitor = ReferencesFinderVisitor::new(
+            self.db.table(path),
+            symbol_name,
+            symbol_type,
+            type_inferer,
+            node_stack.nodes(),
+            include_declaration,
+        );
+        result.insert(
+            self.db.indexer().file_id(path),
+            references_visitor.find_references(suite),
+        );
     }
 }
 
