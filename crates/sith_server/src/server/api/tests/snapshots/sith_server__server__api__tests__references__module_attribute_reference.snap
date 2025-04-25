@@ -1,0 +1,26 @@
+---
+source: crates/sith_server/src/server/api/tests/references.rs
+expression: "ReferencesOutput::new(references(&snapshot, params), snapshot.encoding())"
+---
+test-module-attr-references/module3.py
+--------------------------------------
+module1.func1()   LINE: 4 (9..14)
+        ^^^^^
+
+
+test-module-attr-references/module2.py
+--------------------------------------
+module1.func1()   LINE: 4 (9..14)
+        ^^^^^
+
+
+test-module-attr-references/module1.py
+--------------------------------------
+def func1(): ...   LINE: 2 (5..10)
+    ^^^^^
+
+
+test-module-attr-references/module1.py
+--------------------------------------
+print(func1())   LINE: 4 (7..12)
+      ^^^^^

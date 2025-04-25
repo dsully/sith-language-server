@@ -1,0 +1,20 @@
+---
+source: crates/sith_server/src/server/api/tests/references.rs
+expression: "ReferencesOutput::new(references(&snapshot, params), snapshot.encoding())"
+---
+test-references-across-files/views.py
+-------------------------------------
+from models import TimeCategory   LINE: 2 (20..32)
+                   ^^^^^^^^^^^^
+
+
+test-references-across-files/views.py
+-------------------------------------
+    ref = TimeCategory.SOON   LINE: 10 (11..23)
+          ^^^^^^^^^^^^
+
+
+test-references-across-files/models.py
+--------------------------------------
+class TimeCategory(object):   LINE: 2 (7..19)
+      ^^^^^^^^^^^^

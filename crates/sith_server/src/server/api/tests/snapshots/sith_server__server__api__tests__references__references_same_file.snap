@@ -1,0 +1,14 @@
+---
+source: crates/sith_server/src/server/api/tests/references.rs
+expression: "ReferencesOutput::new(references(&snapshot, params), snapshot.encoding())"
+---
+references-same-file/foo.py
+---------------------------
+def foo(): ...   LINE: 2 (5..8)
+    ^^^
+
+
+references-same-file/foo.py
+---------------------------
+  foo()   LINE: 5 (3..6)
+  ^^^

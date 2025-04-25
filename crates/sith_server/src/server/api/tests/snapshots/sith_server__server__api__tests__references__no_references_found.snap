@@ -1,0 +1,5 @@
+---
+source: crates/sith_server/src/server/api/tests/references.rs
+expression: "ReferencesOutput::new(references(&snapshot, params), snapshot.encoding())"
+---
+No references found!

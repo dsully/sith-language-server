@@ -1,0 +1,38 @@
+---
+source: crates/sith_server/src/server/api/tests/references.rs
+expression: "ReferencesOutput::new(references(&snapshot, params), snapshot.encoding())"
+---
+test-class-attr-references/user_model.py
+----------------------------------------
+    def __init__(self, name):   LINE: 3 (24..28)
+                       ^^^^
+
+
+test-class-attr-references/user_model.py
+----------------------------------------
+        self.name = name   LINE: 4 (21..25)
+                    ^^^^
+
+
+test-class-attr-references/user_model.py
+----------------------------------------
+        self.name = name   LINE: 4 (14..18)
+             ^^^^
+
+
+test-class-attr-references/user_model.py
+----------------------------------------
+        print(f"Hello, {self.name}")   LINE: 7 (30..34)
+                             ^^^^
+
+
+test-class-attr-references/user_model.py
+----------------------------------------
+    print(user.name)   LINE: 11 (16..20)
+               ^^^^
+
+
+test-class-attr-references/consumer.py
+--------------------------------------
+print(user.name)   LINE: 5 (12..16)
+           ^^^^
