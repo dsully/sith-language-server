@@ -154,6 +154,10 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         let mut type_inferer = TypeInferer::new(self.db, scope_id, self.current_file.clone());
         let symbol_type = type_inferer.infer_node(symbol_node, node_stack.nodes());
 
+        if symbol_type == ResolvedType::Unknown {
+            return FxHashMap::default();
+        }
+
         let current_file_id = self.db.indexer().file_id(self.current_file);
         let table = self.db.table(self.current_file);
         let references_visitor = ReferencesFinderVisitor::new(
