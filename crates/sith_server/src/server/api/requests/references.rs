@@ -172,7 +172,6 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         result.insert(current_file_id, references_visitor.find_references(suite));
 
         // TODO: find a way to avoid traversing the entire AST if the symbol was defined locally.
-        // Check if the symbol was defined locally to a scope and skip global search.
         let scope_kind = table
             .lookup_symbol(symbol_name, scope_id)
             .map(|(_, symbol)| {
@@ -180,10 +179,13 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
                     .scope(self.current_file, symbol.definition_scope())
                     .kind()
             });
-        if matches!(
-            scope_kind,
-            Some(ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension)
-        ) {
+        // Check if the symbol was defined locally to a scope and skip global search.
+        if !is_symbol_part_of_attr
+            && matches!(
+                scope_kind,
+                Some(ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension)
+            )
+        {
             do_global_search = DoGlobalSearch::No;
         }
 
