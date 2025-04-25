@@ -9,6 +9,7 @@ GlobalOnly {
         ),
         ruff: Some(
             RuffOptions {
+                enable: None,
                 path: Some(
                     "/usr/bin/ruff",
                 ),

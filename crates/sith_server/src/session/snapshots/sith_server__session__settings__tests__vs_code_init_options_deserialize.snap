@@ -9,6 +9,7 @@ HasWorkspaces {
         ),
         ruff: Some(
             RuffOptions {
+                enable: None,
                 path: Some(
                     "",
                 ),
@@ -38,6 +39,7 @@ HasWorkspaces {
                 ),
                 ruff: Some(
                     RuffOptions {
+                        enable: None,
                         path: Some(
                             "ruff",
                         ),
@@ -68,6 +70,7 @@ HasWorkspaces {
                 ),
                 ruff: Some(
                     RuffOptions {
+                        enable: None,
                         path: Some(
                             "ruff",
                         ),
