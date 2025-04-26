@@ -92,7 +92,7 @@ pub enum DeclStmt {
     ImportAlias(DeclId),
     /// Special-case: this used when we have the same import name multiple times in the source
     /// code. Example:
-    /// ```
+    /// ```python
     /// from foo.bar import Bar
     /// from foo import Foo
     /// ```
