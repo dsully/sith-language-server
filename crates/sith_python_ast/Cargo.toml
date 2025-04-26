@@ -7,7 +7,6 @@ edition = "2021"
 [lib]
 
 [dependencies]
-ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
 
 bitflags = { workspace = true }

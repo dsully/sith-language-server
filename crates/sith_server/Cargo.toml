@@ -12,7 +12,6 @@ sith_python_parser = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 sith_semantic_model = { workspace = true }
-ruff_python_resolver = { workspace = true }
 sith_python_ast_utils  = { workspace = true }
 sith_python_utils = { workspace = true }
 

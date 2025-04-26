@@ -467,12 +467,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dyn-clone"
-version = "1.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c7a8fb8a9fbf66c1f703fe16184d10ca0ee9d23be5b4436400408ba54a95005"
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -768,22 +762,6 @@ checksum = "daca1df1c957320b2cf139ac61e7bd64fed304c5040df000a745aa1de3b4ef71"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
-]
-
-[[package]]
-name = "ignore"
-version = "0.4.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d89fd380afde86567dfba715db065673989d6253f42b88179abd3eae47bda4b"
-dependencies = [
- "crossbeam-deque",
- "globset",
- "log",
- "memchr",
- "regex-automata",
- "same-file",
- "walkdir",
- "winapi-util",
 ]
 
 [[package]]
@@ -1347,7 +1325,6 @@ dependencies = [
 name = "ruff_source_file"
 version = "0.0.0"
 dependencies = [
- "insta",
  "memchr",
  "once_cell",
  "ruff_text_size",
@@ -1358,7 +1335,6 @@ dependencies = [
 name = "ruff_text_size"
 version = "0.0.0"
 dependencies = [
- "schemars",
  "serde",
  "serde_test",
  "static_assertions",
@@ -1437,30 +1413,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "schemars"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn",
-]
-
-[[package]]
 name = "serde"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1474,17 +1426,6 @@ name = "serde_derive"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "serde_derive_internals"
-version = "0.29.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1593,7 +1534,6 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "ruff_python_resolver",
- "rustc-hash",
  "serde",
  "serde_json",
  "sith_python_ast",
@@ -1612,7 +1552,6 @@ dependencies = [
  "compact_str",
  "is-macro",
  "itertools 0.11.0",
- "ruff_source_file",
  "ruff_text_size",
  "static_assertions",
 ]
@@ -1641,8 +1580,6 @@ dependencies = [
  "bstr",
  "compact_str",
  "insta",
- "is-macro",
- "itertools 0.11.0",
  "memchr",
  "ruff_source_file",
  "ruff_text_size",
@@ -1662,7 +1599,6 @@ dependencies = [
  "anyhow",
  "base64",
  "dirs 6.0.0",
- "rayon",
  "regex",
  "ruff_python_resolver",
  "rustc-hash",
@@ -1683,9 +1619,7 @@ dependencies = [
  "bitflags 2.9.0",
  "compact_str",
  "directories",
- "ignore",
  "indexmap",
- "insta",
  "itertools 0.11.0",
  "log",
  "path-slash",
@@ -1716,7 +1650,6 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
- "ruff_python_resolver",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",

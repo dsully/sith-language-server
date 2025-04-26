@@ -26,7 +26,6 @@ harness = false
 url = "2.5.0"
 ureq = "2.9.6"
 criterion = "0.5.1"
-rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

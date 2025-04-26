@@ -13,9 +13,6 @@ memchr = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, optional = true }
 
-[dev-dependencies]
-insta = { version = "1.31.0", features = ["yaml"] }
-
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

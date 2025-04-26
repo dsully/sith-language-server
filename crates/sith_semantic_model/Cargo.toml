@@ -15,7 +15,6 @@ ruff_text_size = { workspace = true, features = ["serde"] }
 ruff_python_resolver = { workspace = true }
 
 compact_str = { workspace = true }
-ignore = { workspace = true }
 bitflags = { workspace = true }
 itertools = { workspace = true }
 rustc-hash = { workspace = true }
@@ -33,6 +32,3 @@ tracing = { workspace = true }
 path-slash = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
-
-[dev-dependencies]
-insta = { version = "1.31.0", features = ["yaml"] }
