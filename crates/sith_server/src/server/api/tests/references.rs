@@ -1,27 +1,22 @@
 use std::fmt::Display;
 
-use lsp_types::{self as types, request::Request, Location, Url};
-use ruff_source_file::{LineIndex, OneIndexed};
+use lsp_types::{self as types, Location, Url};
 
 use crate::{
-    edit::RangeExt,
-    server::api::{
-        requests::{self as req, references::references},
-        tests::strip_temp_dir,
-    },
+    server::api::requests::{self as req, references::references},
     PositionEncoding,
 };
 
-use super::lsp_client::{LspClientMockup, TestRequestHandler};
+use super::{
+    lsp_client::{LspClientMockup, TestRequestHandler},
+    SymbolLocationPrinter,
+};
 
 impl TestRequestHandler for req::References {
-    fn build_params(
-        uri: Url,
-        position: lsp_types::Position,
-    ) -> <Self::RequestType as Request>::Params {
+    fn build_params(uri: Url, position: lsp_types::Position) -> types::ReferenceParams {
         types::ReferenceParams {
-            text_document_position: lsp_types::TextDocumentPositionParams {
-                text_document: lsp_types::TextDocumentIdentifier { uri },
+            text_document_position: types::TextDocumentPositionParams {
+                text_document: types::TextDocumentIdentifier { uri },
                 position,
             },
             context: types::ReferenceContext {
@@ -56,50 +51,9 @@ impl Display for ReferencesOutput {
         }
 
         for location in self.results.as_ref().unwrap() {
-            let file_path = location.uri.to_file_path().unwrap();
-            let stripped_path = strip_temp_dir(&file_path);
-
-            let contents = std::fs::read_to_string(&file_path).expect("Failed to read file!");
-            let index = LineIndex::from_source_text(&contents);
-
-            if location.range.start.line != location.range.end.line {
-                return writeln!(
-                    f,
-                    "ERROR: A symbol reference can not be across multiple lines.\nStart line: {}\nEnd line: {}",
-                    location.range.start.line, location.range.end.line
-                );
-            }
-
-            let line_idx = location.range.start.line;
-            let line_str = contents.lines().nth(line_idx as usize).unwrap();
-            let line_start_offset =
-                index.line_start(OneIndexed::from_zero_indexed(line_idx as usize), &contents);
-            let range = location
-                .range
-                .to_text_range(&contents, &index, self.encoding);
-            let symbol = &contents[range];
-            // Normalize the range to be within the line range.
-            let start_symbol_idx = range
-                .sub_start(line_start_offset)
-                .sub_end(line_start_offset)
-                .start()
-                .to_usize();
-
-            writeln!(
-                f,
-                "{}\n{}",
-                stripped_path.display(),
-                "-".repeat(stripped_path.as_os_str().len())
-            )?;
-            writeln!(
-                f,
-                "{line_str}   LINE: {} ({}..{})\n{}{}\n\n",
-                line_idx + 1,
-                location.range.start.character + 1,
-                location.range.end.character + 1,
-                " ".repeat(start_symbol_idx),
-                "^".repeat(symbol.len())
-            )?;
+            SymbolLocationPrinter::new(location, self.encoding)
+                .underline_whole_symbol()
+                .fmt(f)?;
         }
 
         Ok(())
