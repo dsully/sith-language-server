@@ -15,41 +15,46 @@ impl Replacement {
         modified_line_starts: &[TextSize],
     ) -> Self {
         let mut source_start = TextSize::default();
-        let mut replaced_start = TextSize::default();
-        let mut source_end = source.text_len();
-        let mut replaced_end = modified.text_len();
-        let mut line_iter = source_line_starts
+        let mut modified_start = TextSize::default();
+
+        for (source_line_start, modified_line_start) in source_line_starts
             .iter()
             .copied()
-            .zip(modified_line_starts.iter().copied());
-        for (source_line_start, modified_line_start) in line_iter.by_ref() {
-            if source_line_start != modified_line_start
-                || source[TextRange::new(source_start, source_line_start)]
-                    != modified[TextRange::new(replaced_start, modified_line_start)]
+            .zip(modified_line_starts.iter().copied())
+            .skip(1)
+        {
+            if source[TextRange::new(source_start, source_line_start)]
+                != modified[TextRange::new(modified_start, modified_line_start)]
             {
                 break;
             }
             source_start = source_line_start;
-            replaced_start = modified_line_start;
+            modified_start = modified_line_start;
         }
 
-        let mut line_iter = line_iter.rev();
+        let mut source_end = source.text_len();
+        let mut modified_end = modified.text_len();
 
-        for (old_line_start, new_line_start) in line_iter.by_ref() {
-            if old_line_start <= source_start
-                || new_line_start <= replaced_start
-                || source[TextRange::new(old_line_start, source_end)]
-                    != modified[TextRange::new(new_line_start, replaced_end)]
+        for (source_line_start, modified_line_start) in source_line_starts
+            .iter()
+            .rev()
+            .copied()
+            .zip(modified_line_starts.iter().rev().copied())
+        {
+            if source_line_start < source_start
+                || modified_line_start < modified_start
+                || source[TextRange::new(source_line_start, source_end)]
+                    != modified[TextRange::new(modified_line_start, modified_end)]
             {
                 break;
             }
-            source_end = old_line_start;
-            replaced_end = new_line_start;
+            source_end = source_line_start;
+            modified_end = modified_line_start;
         }
 
         Replacement {
             source_range: TextRange::new(source_start, source_end),
-            modified_range: TextRange::new(replaced_start, replaced_end),
+            modified_range: TextRange::new(modified_start, modified_end),
         }
     }
 }
