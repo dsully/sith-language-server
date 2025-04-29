@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::panic::PanicHookInfo;
 use std::str::FromStr;
 
 use connection::Connection;
@@ -26,6 +27,7 @@ use types::WorkspaceFoldersServerCapabilities;
 use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
+use crate::message::try_show_message;
 use crate::session::AllSettings;
 use crate::session::ClientEditor;
 use crate::session::ClientSettings;
@@ -133,6 +135,48 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
+        // The new PanicInfoHook name requires MSRV >= 1.82
+        #[allow(deprecated)]
+        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+        struct RestorePanicHook {
+            hook: Option<PanicHook>,
+        }
+
+        impl Drop for RestorePanicHook {
+            fn drop(&mut self) {
+                if let Some(hook) = self.hook.take() {
+                    std::panic::set_hook(hook);
+                }
+            }
+        }
+
+        // unregister any previously registered panic hook
+        // The hook will be restored when this function exits.
+        let _ = RestorePanicHook {
+            hook: Some(std::panic::take_hook()),
+        };
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\nSTACKTRACE:\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\nSTACKTRACE:\n{backtrace}").ok();
+
+            try_show_message(
+                "The Sith language server exited with a panic. See the logs for more details."
+                    .to_string(),
+                lsp_types::MessageType::ERROR,
+            )
+            .ok();
+        }));
+
         event_loop_thread(move || {
             Self::event_loop(
                 &self.connection,
