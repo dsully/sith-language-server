@@ -6,11 +6,11 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
 
-use sith_python_ast::visitor::preorder::{walk_module, PreorderVisitor, TraversalSignal};
-use sith_python_ast::{AnyNodeRef, Mod};
-use sith_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use sith_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
+use sith_python_ast::{AnyNodeRef, Mod};
+use sith_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
 
 #[test]
 fn valid_syntax() {
@@ -290,7 +290,7 @@ impl<'a> ValidateAstVisitor<'a> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for ValidateAstVisitor<'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,
