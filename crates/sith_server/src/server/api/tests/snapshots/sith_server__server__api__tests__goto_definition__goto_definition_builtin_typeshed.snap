@@ -1,0 +1,8 @@
+---
+source: crates/sith_server/src/server/api/tests/goto_definition.rs
+expression: "GotoDefinitionOutput::new(goto_definition(snapshot, params), encoding)"
+---
+.local/share/sith-lsp/typeshed/stdlib/builtins.pyi
+--------------------------------------------------
+class int:   LINE: 224 (7..10)
+      ^

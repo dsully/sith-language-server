@@ -1,0 +1,8 @@
+---
+source: crates/sith_server/src/server/api/tests/goto_definition.rs
+expression: "GotoDefinitionOutput::new(goto_definition(snapshot, params), encoding)"
+---
+goto-class-attribute-definition/file1.py
+----------------------------------------
+    self.attr = None   LINE: 4 (5..14)
+    ^

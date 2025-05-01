@@ -1,0 +1,8 @@
+---
+source: crates/sith_server/src/server/api/tests/goto_definition.rs
+expression: "GotoDefinitionOutput::new(goto_definition(snapshot, params), encoding)"
+---
+goto-definition-across-files/file1.py
+-------------------------------------
+def external_func(): ...   LINE: 2 (5..18)
+    ^

@@ -1,0 +1,8 @@
+---
+source: crates/sith_server/src/server/api/tests/goto_definition.rs
+expression: "GotoDefinitionOutput::new(goto_definition(snapshot, params), encoding)"
+---
+goto-module-attribute-definition/file1.py
+-----------------------------------------
+def thingy(): ...   LINE: 2 (5..11)
+    ^
