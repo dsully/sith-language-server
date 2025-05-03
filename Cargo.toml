@@ -23,6 +23,7 @@ sith_semantic_model = { path = "crates/sith_semantic_model", package = "sith_sem
 ruff_python_resolver = { path = "crates/ruff_python_resolver", package = "ruff_python_resolver" }
 sith_python_ast_utils = { path = "crates/sith_python_ast_utils", package = "sith_python_ast_utils" }
 sith_python_utils = { path = "crates/sith_python_utils", package = "sith_python_utils" }
+sith_vendored = { path = "crates/sith_vendored", package = "sith_vendored" }
 lsp-types = { path = "crates/lsp-types", features = ["proposed"] }
 
 bitflags = "2.4.1"

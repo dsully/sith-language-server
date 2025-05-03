@@ -24,9 +24,7 @@ use crate::{
     declaration::{DeclId, Declaration, DeclarationQuery, ImportSource},
     symbol::{Symbol, SymbolId},
     symbol_table::{ImportResolverConfig, SymbolTable, SymbolTableBuilder},
-    util,
-    vendored::setup_typeshed,
-    Scope, ScopeId,
+    util, Scope, ScopeId,
 };
 
 pub enum Source<'a> {
@@ -197,7 +195,7 @@ pub struct Indexer {
 
 impl Indexer {
     fn new(root: PathBuf, python_host: PythonHost) -> Self {
-        let typeshed_path = setup_typeshed();
+        let typeshed_path = sith_vendored::setup_typeshed();
         Self {
             tables: FxHashMap::default(),
             asts: FxHashMap::default(),

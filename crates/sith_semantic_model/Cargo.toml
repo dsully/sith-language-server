@@ -10,6 +10,7 @@ sith_python_ast = { workspace = true }
 sith_python_ast_utils = { workspace = true }
 sith_python_parser = { workspace = true }
 sith_python_utils = { workspace = true }
+sith_vendored = { workspace = true }
 ruff_index = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true, features = ["serde"] }
 ruff_python_resolver = { workspace = true }
@@ -20,15 +21,7 @@ itertools = { workspace = true }
 rustc-hash = { workspace = true }
 rayon = { workspace = true }
 bimap = { workspace = true }
-zip = { workspace = true }
-log = { workspace = true }
-directories = { workspace = true }
 walkdir = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-
-[build-dependencies]
-path-slash = { workspace = true }
-walkdir = { workspace = true }
-zip = { workspace = true }

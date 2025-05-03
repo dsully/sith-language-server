@@ -8,7 +8,9 @@ use std::{
 use directories::BaseDirs;
 use log::debug;
 
-use crate::TYPESHED_ZIP_BYTES;
+// The file path here is hardcoded in this crate's `build.rs` script.
+// Luckily this crate will fail to build if this file isn't available at build time.
+static TYPESHED_ZIP_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/zipped_typeshed.zip"));
 
 fn unzip_typeshed(path: &Path) {
     let mut typeshed_zip_archive =
@@ -36,7 +38,7 @@ fn unzip_typeshed(path: &Path) {
 /// If this function fails to get the user data directory, the current directory is used instead.
 /// The data directory in Linux is `$XDG_DATA_HOME` or `$HOME/.local/share`; in MacOS is `$HOME/Library/Application Support`;
 /// in Windows is `{FOLDERID_RoamingAppData}`.
-pub(crate) fn setup_typeshed() -> PathBuf {
+pub fn setup_typeshed() -> PathBuf {
     let sith_dir = if let Some(base_dirs) = BaseDirs::new() {
         base_dirs.data_dir().join("sith-lsp")
     } else {

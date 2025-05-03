@@ -34,4 +34,5 @@ sith_python_parser = { workspace = true }
 sith_python_ast = { workspace = true }
 sith_semantic_model = { workspace = true }
 sith_python_utils = { workspace = true }
+sith_vendored = { workspace = true }
 ruff_python_resolver = { workspace = true }

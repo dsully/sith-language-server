@@ -47,7 +47,7 @@ fn benchmark_semantic_table_builder(criterion: &mut Criterion<WallTime>) {
         extra_paths: vec![],
     };
     let config = Config {
-        typeshed_path: None,
+        typeshed_path: Some(sith_vendored::setup_typeshed()),
         stub_path: None,
         venv_path: None,
         venv: None,

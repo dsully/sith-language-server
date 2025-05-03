@@ -1540,6 +1540,7 @@ dependencies = [
  "sith_python_parser",
  "sith_python_utils",
  "sith_semantic_model",
+ "sith_vendored",
  "ureq",
  "url",
 ]
@@ -1618,11 +1619,8 @@ dependencies = [
  "bimap",
  "bitflags 2.9.0",
  "compact_str",
- "directories",
  "indexmap",
  "itertools 0.11.0",
- "log",
- "path-slash",
  "rayon",
  "ruff_index",
  "ruff_python_resolver",
@@ -1633,9 +1631,9 @@ dependencies = [
  "sith_python_ast_utils",
  "sith_python_parser",
  "sith_python_utils",
+ "sith_vendored",
  "tracing",
  "walkdir",
- "zip",
 ]
 
 [[package]]
@@ -1664,6 +1662,17 @@ dependencies = [
  "sith_semantic_model",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sith_vendored"
+version = "0.2.4-alpha"
+dependencies = [
+ "directories",
+ "log",
+ "path-slash",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]

@@ -1,0 +1,17 @@
+[package]
+name = "sith_vendored"
+version = { workspace = true }
+publish = false
+edition = "2021"
+
+[lib]
+
+[dependencies]
+zip = { workspace = true }
+log = { workspace = true }
+directories = { workspace = true }
+
+[build-dependencies]
+path-slash = { workspace = true }
+walkdir = { workspace = true }
+zip = { workspace = true }
