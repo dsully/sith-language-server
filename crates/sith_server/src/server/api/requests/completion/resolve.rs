@@ -96,10 +96,9 @@ fn get_completion_item_documentation(
                         get_documentation_string_from_node(completion_item_node)
                     } else {
                         let content = sm::util::read_to_string(non_stub_path.as_path()).ok()?;
-                        let (table, ast) = db.indexer().symbol_table_builder(
+                        let (table, ast) = db.indexer().build_symbol_table(
                             non_stub_path,
                             completion_item_symbol_data.file_id(),
-                            true,
                             &content,
                         );
                         let declaration = table.symbol_declaration(

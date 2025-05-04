@@ -4,7 +4,7 @@ use sith_benchmark::criterion::{
 use sith_benchmark::{ensure_home_assistant_repo, find_all_python_files};
 use sith_python_utils::interpreter::resolve_python_interpreter;
 use sith_python_utils::PythonHost;
-use sith_semantic_model::db::{Source, SymbolTableDb};
+use sith_semantic_model::db::SymbolTableDb;
 
 fn compute_throughput() -> u64 {
     let python_files =
@@ -35,13 +35,9 @@ fn benchmark_indexer(criterion: &mut Criterion<WallTime>) {
     group.bench_with_input(
         BenchmarkId::from_parameter("homeassistant"),
         &content,
-        |b, case| {
+        |b, _| {
             b.iter(|| {
-                let mut db = SymbolTableDb::new(repo_path.clone(), python_host.clone())
-                    .with_builtin_symbols()
-                    .with_collection_types();
-                db.indexer_mut()
-                    .add_or_update_file(file.clone(), Source::New(case));
+                let _ = SymbolTableDb::new(repo_path.clone(), python_host.clone());
             });
         },
     );

@@ -19,6 +19,7 @@ mod tests {
     use std::fs::{create_dir_all, File};
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
+    use std::sync::{Arc, RwLock};
 
     use log::debug;
     use tempfile::TempDir;
@@ -116,7 +117,6 @@ mod tests {
         } else {
             Vec::new()
         });
-        let mut cache = ImportResolverCache::default();
 
         resolve_import(
             source_file.as_ref(),
@@ -124,7 +124,7 @@ mod tests {
             &module_descriptor,
             &config,
             &host,
-            &mut cache,
+            Arc::new(RwLock::new(ImportResolverCache::default())),
         )
     }
 

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sith_python_ast_utils::nodes::NodeId;
 use sith_python_utils::is_python_module;
 
-use crate::{db::FileId, symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
+use crate::{indexer::FileId, symbol::SymbolId, symbol_table::SymbolTable, ScopeId};
 
 #[newtype_index]
 #[derive(Serialize, Deserialize)]

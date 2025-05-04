@@ -250,7 +250,7 @@ impl<'db, 'p> ReferencesFinder<'db, 'p> {
         for (file_id, table) in self
             .db
             .indexer()
-            .tables()
+            .tables_iter()
             // skip searching the current file for references
             .filter(|(file_id, _)| **file_id != current_file_id)
             // only search files that import `symbol_name`

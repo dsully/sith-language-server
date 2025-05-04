@@ -1,4 +1,7 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
 use bitflags::bitflags;
 use ruff_python_resolver::{
@@ -19,11 +22,11 @@ use sith_python_ast_utils::{
 use sith_python_utils::{is_python_module, PythonHost};
 
 use crate::{
-    db::FileId,
     declaration::{
         DeclId, DeclStmt, Declaration, DeclarationKind, DeclarationQuery, Declarations,
         ImportSource, SymbolDeclarations,
     },
+    indexer::FileId,
     symbol::{Symbol, SymbolFlags, SymbolId, Symbols},
     Scope, ScopeId, ScopeKind, Scopes,
 };
@@ -115,7 +118,6 @@ impl Default for SymbolTable {
 
 struct FileInfo<'a> {
     path: &'a Path,
-    is_thirdparty: bool,
     is_builtin_stub_file: bool,
 }
 
@@ -131,6 +133,7 @@ bitflags! {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct ImportResolverConfig<'a> {
     exec_env: &'a ExecutionEnvironment,
     config: &'a Config,
@@ -167,20 +170,19 @@ pub struct SymbolTableBuilder<'a> {
     table: SymbolTable,
 
     import_resolver_cfg: ImportResolverConfig<'a>,
-    import_resolver_cache: ImportResolverCache,
+    import_resolver_cache: Arc<RwLock<ImportResolverCache>>,
 }
 
 impl<'a> SymbolTableBuilder<'a> {
     pub fn new(
         filepath: &'a Path,
         file_id: FileId,
-        is_thirdparty: bool,
         import_resolver_cfg: ImportResolverConfig<'a>,
+        import_resolver_cache: Arc<RwLock<ImportResolverCache>>,
     ) -> Self {
         Self {
             file_info: FileInfo {
                 path: filepath,
-                is_thirdparty,
                 is_builtin_stub_file: filepath.ends_with("stdlib/builtins.pyi"),
             },
             file_id,
@@ -192,7 +194,7 @@ impl<'a> SymbolTableBuilder<'a> {
             table: SymbolTable::new(),
             flags: VisitorFlags::empty(),
             import_resolver_cfg,
-            import_resolver_cache: ImportResolverCache::default(),
+            import_resolver_cache,
         }
     }
 
@@ -414,13 +416,9 @@ where
                 self.curr_scope = self.push_scope(ScopeKind::Function, *range);
                 self.visit_parameters(parameters);
 
-                // If the current file is from the python stdlib or "site-packages"
+                // TODO: If the current file is from the python stdlib or "site-packages"
                 // we should only visit the first statement of the function body.
-                if self.file_info.is_thirdparty && !body.is_empty() {
-                    self.visit_body(&body[..1]);
-                } else {
-                    self.visit_body(body);
-                }
+                self.visit_body(body);
 
                 let declaration = self.table.decls.get_mut(decl_id).unwrap();
                 declaration.kind = if self.flags.contains(VisitorFlags::IN_CLASS) {
@@ -476,7 +474,7 @@ where
                     &descriptor,
                     self.import_resolver_cfg.config,
                     self.import_resolver_cfg.host,
-                    &mut self.import_resolver_cache,
+                    self.import_resolver_cache.clone(),
                 );
                 let is_thirdparty = matches!(
                     import_result.import_type,
@@ -628,7 +626,7 @@ where
                         &descriptor,
                         self.import_resolver_cfg.config,
                         self.import_resolver_cfg.host,
-                        &mut self.import_resolver_cache,
+                        self.import_resolver_cache.clone(),
                     );
                     let is_thirdparty = matches!(
                         import_result.import_type,

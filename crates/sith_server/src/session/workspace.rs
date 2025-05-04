@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context};
 use lsp_types::Url;
+use rustc_hash::FxHashMap;
 use sith_python_utils::interpreter::resolve_python_interpreter;
 use sith_python_utils::{find_python_project_root, PythonHost};
-use rustc_hash::FxHashMap;
 use sith_semantic_model::db::{Source, SymbolTableDb};
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -50,35 +50,31 @@ pub(crate) struct DocumentRef {
 
 #[derive(Debug)]
 pub(crate) struct SymbolTableDbController {
-    table: Arc<SymbolTableDb>,
+    db: Arc<SymbolTableDb>,
 }
 
 impl SymbolTableDbController {
     pub fn new(root: PathBuf, python_host: PythonHost) -> Self {
         Self {
-            table: Arc::new(
-                SymbolTableDb::new(root, python_host)
-                    .with_builtin_symbols()
-                    .with_collection_types(),
-            ),
+            db: Arc::new(SymbolTableDb::new(root, python_host)),
         }
     }
 
     pub fn make_ref(&self) -> SymbolTableDbRef {
         SymbolTableDbRef {
-            table: self.table.clone(),
+            table: self.db.clone(),
         }
     }
 
     pub fn make_mut(&mut self) -> &mut SymbolTableDb {
-        Arc::make_mut(&mut self.table)
+        Arc::make_mut(&mut self.db)
     }
 }
 
 impl Deref for SymbolTableDbController {
     type Target = SymbolTableDb;
     fn deref(&self) -> &Self::Target {
-        &self.table
+        &self.db
     }
 }
 

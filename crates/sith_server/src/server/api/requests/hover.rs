@@ -161,9 +161,9 @@ fn get_docs_for_non_stub(
         get_documentation_string_from_node(node_stack.nodes().get(node_id).unwrap())
     } else {
         let content = sm::util::read_to_string(non_stub_path.as_path()).ok()?;
-        let (table, ast) =
-            db.indexer()
-                .symbol_table_builder(non_stub_path, file_id, true, &content);
+        let (table, ast) = db
+            .indexer()
+            .build_symbol_table(non_stub_path, file_id, &content);
         let node_stack = NodeStack::default().is_thirdparty(true).build(ast.suite());
 
         let declaration =

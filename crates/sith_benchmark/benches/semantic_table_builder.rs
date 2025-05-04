@@ -1,5 +1,7 @@
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
+use ruff_python_resolver::cache::ImportResolverCache;
 use ruff_python_resolver::config::Config;
 use ruff_python_resolver::execution_environment::ExecutionEnvironment;
 use sith_benchmark::criterion::{
@@ -52,6 +54,7 @@ fn benchmark_semantic_table_builder(criterion: &mut Criterion<WallTime>) {
         venv_path: None,
         venv: None,
     };
+    let import_resolver_cache = Arc::new(RwLock::new(ImportResolverCache::default()));
     for case in test_cases {
         let parsed = parse_module(case.code());
 
@@ -65,8 +68,8 @@ fn benchmark_semantic_table_builder(criterion: &mut Criterion<WallTime>) {
                     let table_builder = SymbolTableBuilder::new(
                         Path::new(case.name()),
                         FileId::from_u32(0),
-                        false,
                         resolver_cfg,
+                        import_resolver_cache.clone(),
                     );
                     table_builder.build(parsed.suite());
                 });

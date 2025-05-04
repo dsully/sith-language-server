@@ -2,6 +2,7 @@
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use log::debug;
 
@@ -264,7 +265,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
     allow_pyi: bool,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<ImportResult> {
     let import_name = module_descriptor.name();
     debug!("Import name: {import_name}");
@@ -354,7 +355,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
     }
 
     // Look for third-party imports in Python's `sys` path.
-    for search_path in search::python_search_paths(config, host, cache) {
+    for search_path in search::python_search_paths(config, host, cache.clone()) {
         debug!("Looking in Python search path: {}", search_path.display());
 
         let mut third_party_import = resolve_absolute_import(
@@ -378,7 +379,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
     // If a library is fully `py.typed`, prefer the current result. There's one exception:
     // we're executing from `typeshed` itself. In that case, use the `typeshed` lookup below,
     // rather than favoring `py.typed` libraries.
-    if let Some(typeshed_root) = search::typeshed_root(config, host, cache) {
+    if let Some(typeshed_root) = search::typeshed_root(config, host, cache.clone()) {
         debug!(
             "Looking in typeshed root directory: {}",
             typeshed_root.display()
@@ -396,7 +397,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
         // Check for a stdlib typeshed file.
         debug!("Looking for typeshed stdlib path: {}", import_name);
         if let Some(mut typeshed_stdilib_import) =
-            find_typeshed_path(module_descriptor, true, config, host, cache)
+            find_typeshed_path(module_descriptor, true, config, host, cache.clone())
         {
             typeshed_stdilib_import.is_stdlib_typeshed_file = true;
             return Some(typeshed_stdilib_import);
@@ -430,7 +431,7 @@ fn find_typeshed_path<Host: host::Host>(
     is_std_lib: bool,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<ImportResult> {
     if is_std_lib {
         debug!("Looking for typeshed `stdlib` path");
@@ -639,18 +640,20 @@ fn resolve_import_strict<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> ImportResult {
     let import_name = module_descriptor.name();
 
-    if let Some(cached_result) = cache.get_import_result(
-        source_file,
-        &import_name,
-        module_descriptor,
-        execution_environment,
-    ) {
-        debug!("Cache HIT for IMPORT: {import_name}");
-        return cached_result;
+    if let Ok(cache) = cache.read() {
+        if let Some(cached_result) = cache.get_import_result(
+            source_file,
+            &import_name,
+            module_descriptor,
+            execution_environment,
+        ) {
+            debug!("Cache HIT for IMPORT: {import_name}");
+            return cached_result;
+        }
     }
     debug!("Cache MISS for IMPORT: {import_name}");
 
@@ -662,7 +665,7 @@ fn resolve_import_strict<Host: host::Host>(
         if let Some(mut relative_import) = relative_import {
             relative_import.is_relative = true;
 
-            cache.add_import_result(
+            cache.write().unwrap().add_import_result(
                 source_file,
                 &import_name,
                 execution_environment,
@@ -680,7 +683,7 @@ fn resolve_import_strict<Host: host::Host>(
             true,
             config,
             host,
-            cache,
+            cache.clone(),
         );
 
         if let Some(mut best_import) = best_import {
@@ -694,13 +697,13 @@ fn resolve_import_strict<Host: host::Host>(
                         false,
                         config,
                         host,
-                        cache,
+                        cache.clone(),
                     )
                     .unwrap_or_else(ImportResult::not_found),
                 ));
             }
 
-            cache.add_import_result(
+            cache.write().unwrap().add_import_result(
                 source_file,
                 &import_name,
                 execution_environment,
@@ -711,7 +714,7 @@ fn resolve_import_strict<Host: host::Host>(
         }
     }
 
-    cache.add_import_result(
+    cache.write().unwrap().add_import_result(
         source_file,
         &import_name,
         execution_environment,
@@ -736,7 +739,7 @@ pub fn resolve_import<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> ImportResult {
     let import_result = resolve_import_strict(
         source_file,

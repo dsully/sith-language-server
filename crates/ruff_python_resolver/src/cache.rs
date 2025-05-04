@@ -25,11 +25,11 @@ impl ImportResultCacheKey {
 #[derive(Debug, Default)]
 pub struct ImportResolverCache {
     import_result: FxHashMap<ImportResultCacheKey, ImportResult>,
-    pub(crate) python_search_paths: Vec<PathBuf>,
-    pub(crate) typeshed_root: Option<PathBuf>,
-    pub(crate) typeshed_stdlib_path: Option<PathBuf>,
-    pub(crate) typeshed_stubs_path: Option<PathBuf>,
-    pub(crate) typeshed_third_party_package_paths: Option<FxHashMap<String, Vec<PathBuf>>>,
+    python_search_paths: Vec<PathBuf>,
+    typeshed_path: Option<PathBuf>,
+    typeshed_stdlib_path: Option<PathBuf>,
+    typeshed_stubs_path: Option<PathBuf>,
+    typeshed_third_party_package_paths: Option<FxHashMap<String, Vec<PathBuf>>>,
 }
 
 impl ImportResolverCache {
@@ -66,5 +66,54 @@ impl ImportResolverCache {
                 import_name,
             ))
             .cloned()
+    }
+
+    pub(crate) fn add_python_search_paths(&mut self, search_paths: Vec<PathBuf>) {
+        self.python_search_paths = search_paths;
+    }
+
+    pub(crate) fn get_python_search_paths(&self) -> Option<Vec<PathBuf>> {
+        if self.python_search_paths.is_empty() {
+            None
+        } else {
+            Some(self.python_search_paths.clone())
+        }
+    }
+
+    pub(crate) fn get_typeshed_path(&self) -> Option<PathBuf> {
+        self.typeshed_path.clone()
+    }
+
+    pub(crate) fn add_typeshed_path(&mut self, typeshed_root: PathBuf) {
+        self.typeshed_path = Some(typeshed_root);
+    }
+
+    pub(crate) fn get_typeshed_stdlib_path(&self) -> Option<PathBuf> {
+        self.typeshed_stdlib_path.clone()
+    }
+
+    pub(crate) fn add_typshed_stdlib_path(&mut self, typeshed_stdlib_path: PathBuf) {
+        self.typeshed_stdlib_path = Some(typeshed_stdlib_path);
+    }
+
+    pub(crate) fn get_typeshed_stubs_path(&self) -> Option<PathBuf> {
+        self.typeshed_stubs_path.clone()
+    }
+
+    pub(crate) fn add_typshed_stubs_path(&mut self, typeshed_stubs_path: PathBuf) {
+        self.typeshed_stubs_path = Some(typeshed_stubs_path);
+    }
+
+    pub(crate) fn get_typeshed_third_party_package_paths(
+        &self,
+    ) -> Option<FxHashMap<String, Vec<PathBuf>>> {
+        self.typeshed_third_party_package_paths.clone()
+    }
+
+    pub(crate) fn add_typshed_third_party_package_paths(
+        &mut self,
+        packages: FxHashMap<String, Vec<PathBuf>>,
+    ) {
+        self.typeshed_third_party_package_paths = Some(packages);
     }
 }

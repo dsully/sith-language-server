@@ -2,6 +2,7 @@
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use std::{fs, io};
 
 use log::debug;
@@ -173,38 +174,56 @@ fn find_python_search_paths<Host: host::Host>(config: &Config, host: &Host) -> V
 pub(crate) fn python_search_paths<Host: host::Host>(
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Vec<PathBuf> {
-    if cache.python_search_paths.is_empty() {
-        cache.python_search_paths = find_python_search_paths(config, host);
+    if let Ok(cache) = cache.read() {
+        if let Some(search_paths) = cache.get_python_search_paths() {
+            return search_paths;
+        }
     }
 
-    cache.python_search_paths.clone()
+    let search_paths = find_python_search_paths(config, host);
+    cache
+        .write()
+        .unwrap()
+        .add_python_search_paths(search_paths.clone());
+
+    search_paths
 }
 
 /// Determine the root of the `typeshed` directory.
 pub(crate) fn typeshed_root<Host: host::Host>(
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<PathBuf> {
-    if cache.typeshed_root.is_some() {
-        return cache.typeshed_root.clone();
+    if let Some(typeshed_path) = cache
+        .read()
+        .ok()
+        .and_then(|cache| cache.get_typeshed_path())
+    {
+        return Some(typeshed_path);
     }
 
     if let Some(typeshed_path) = config.typeshed_path.as_ref() {
         // Did the user specify a typeshed path?
         if typeshed_path.is_dir() {
-            cache.typeshed_root = Some(typeshed_path.clone());
-            return cache.typeshed_root.clone();
+            cache
+                .write()
+                .unwrap()
+                .add_typeshed_path(typeshed_path.clone());
+            return Some(typeshed_path.clone());
         }
     } else {
         // If not, we'll look in the Python search paths.
-        for python_search_path in python_search_paths(config, host, cache) {
+        for python_search_path in python_search_paths(config, host, cache.clone()) {
             let possible_typeshed_path = python_search_path.join("typeshed");
             if possible_typeshed_path.is_dir() {
-                cache.typeshed_root = Some(possible_typeshed_path);
-                return cache.typeshed_root.clone();
+                cache
+                    .write()
+                    .unwrap()
+                    .add_typeshed_path(possible_typeshed_path.clone());
+                return Some(possible_typeshed_path);
             }
         }
     }
@@ -217,22 +236,24 @@ fn typeshed_subdirectory<Host: host::Host>(
     is_stdlib: bool,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<PathBuf> {
-    if is_stdlib && cache.typeshed_stdlib_path.is_some() {
-        return cache.typeshed_stdlib_path.clone();
-    } else if cache.typeshed_stubs_path.is_some() {
-        return cache.typeshed_stubs_path.clone();
+    if let Ok(cache) = cache.read() {
+        if let Some(typeshed_stdlib_path) = cache.get_typeshed_stdlib_path().filter(|_| is_stdlib) {
+            return Some(typeshed_stdlib_path);
+        } else if let Some(typeshed_stubs_path) = cache.get_typeshed_stubs_path() {
+            return Some(typeshed_stubs_path);
+        }
     }
-    let mut typeshed_path = typeshed_root(config, host, cache)?;
+    let mut typeshed_path = typeshed_root(config, host, cache.clone())?;
 
     typeshed_path = if is_stdlib {
         let path = typeshed_path.join("stdlib");
-        cache.typeshed_stubs_path = Some(path.clone());
+        cache.write().unwrap().add_typshed_stdlib_path(path.clone());
         path
     } else {
         let path = typeshed_path.join("stubs");
-        cache.typeshed_stubs_path = Some(path.clone());
+        cache.write().unwrap().add_typshed_stubs_path(path.clone());
         path
     };
 
@@ -247,10 +268,12 @@ fn typeshed_subdirectory<Host: host::Host>(
 /// containing the package's stubs.
 fn build_typeshed_third_party_package_map(
     third_party_dir: &Path,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> io::Result<FxHashMap<String, Vec<PathBuf>>> {
-    if cache.typeshed_third_party_package_paths.is_some() {
-        return Ok(cache.typeshed_third_party_package_paths.clone().unwrap());
+    if let Ok(cache) = cache.read() {
+        if let Some(third_party_packages) = cache.get_typeshed_third_party_package_paths() {
+            return Ok(third_party_packages);
+        }
     }
     let mut package_map = FxHashMap::default();
 
@@ -289,7 +312,10 @@ fn build_typeshed_third_party_package_map(
         }
     }
 
-    cache.typeshed_third_party_package_paths = Some(package_map.clone());
+    cache
+        .write()
+        .unwrap()
+        .add_typshed_third_party_package_paths(package_map.clone());
     Ok(package_map)
 }
 
@@ -298,9 +324,9 @@ pub(crate) fn third_party_typeshed_package_paths<Host: host::Host>(
     module_descriptor: &ImportModuleDescriptor,
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<Vec<PathBuf>> {
-    let typeshed_path = typeshed_subdirectory(false, config, host, cache)?;
+    let typeshed_path = typeshed_subdirectory(false, config, host, cache.clone())?;
     let package_paths = build_typeshed_third_party_package_map(&typeshed_path, cache).ok()?;
     let first_name_part = module_descriptor.name_parts.first().map(String::as_str)?;
     package_paths.get(first_name_part).cloned()
@@ -310,7 +336,7 @@ pub(crate) fn third_party_typeshed_package_paths<Host: host::Host>(
 pub(crate) fn stdlib_typeshed_path<Host: host::Host>(
     config: &Config,
     host: &Host,
-    cache: &mut ImportResolverCache,
+    cache: Arc<RwLock<ImportResolverCache>>,
 ) -> Option<PathBuf> {
     typeshed_subdirectory(true, config, host, cache)
 }

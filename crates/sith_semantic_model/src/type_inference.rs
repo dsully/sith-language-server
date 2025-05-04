@@ -12,8 +12,9 @@ use sith_python_ast_utils::{
 use sith_python_utils::is_python_module;
 
 use crate::{
-    db::{FileId, SymbolTableDb},
+    db::SymbolTableDb,
     declaration::{Declaration, DeclarationKind, DeclarationQuery, ImportSource},
+    indexer::FileId,
     mro::compute_mro,
     symbol::SymbolId,
     ScopeId, Symbol,
@@ -1510,9 +1511,7 @@ mod tests {
 
     fn setup_db(src: &str, root: &Path, path: &Path) -> crate::db::SymbolTableDb {
         let interpreter = resolve_python_interpreter(root).expect("Valid python interpreter");
-        let mut db = SymbolTableDb::new(root.to_path_buf(), PythonHost::new(interpreter))
-            .with_builtin_symbols()
-            .with_collection_types();
+        let mut db = SymbolTableDb::new(root.to_path_buf(), PythonHost::new(interpreter));
         db.indexer_mut()
             .add_or_update_file(path.to_path_buf(), Source::New(src));
         db
