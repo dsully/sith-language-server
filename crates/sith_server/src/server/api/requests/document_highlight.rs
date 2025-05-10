@@ -57,20 +57,20 @@ pub(crate) fn document_highlight(
         DoGlobalSearch::No,
     );
 
-    let result = references
+    references
         .get(&db.indexer().file_id(&current_file))
-        .unwrap()
-        .iter()
-        .map(|range| types::DocumentHighlight {
-            range: range.to_range(document.contents(), document.index(), snapshot.encoding()),
-            // TODO: implement this
-            kind: None,
+        .map(|result| {
+            result
+                .iter()
+                .map(|range| types::DocumentHighlight {
+                    range: range.to_range(
+                        document.contents(),
+                        document.index(),
+                        snapshot.encoding(),
+                    ),
+                    // TODO: implement this
+                    kind: None,
+                })
+                .collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>();
-
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
 }
