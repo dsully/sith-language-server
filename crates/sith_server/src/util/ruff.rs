@@ -4,7 +4,7 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 
 /// Arguments that are not allowed to be passed to `ruff check`.
 pub(crate) const UNSUPPORTED_CHECK_ARGS: &[&str] = &[
@@ -75,16 +75,24 @@ where
     let mut stdin = child.stdin.take().context("Failed to take stdin")?;
 
     let input_bytes = stdin_input.as_ref();
-    std::thread::scope(|s| {
-        s.spawn(move || {
-            stdin
-                .write_all(input_bytes)
-                .expect("Failed to write to stdin")
-        });
+    let write_result = std::thread::scope(|s| {
+        s.spawn(move || stdin.write_all(input_bytes).map_err(|e| anyhow!(e)))
+            .join()
+            .map_err(|e| anyhow!("Writing thread panicked: {e:?}"))?
     });
     let output = child
         .wait_with_output()
         .context("Failed to wait on child")?;
+
+    if let Err(e) = write_result {
+        if !output.stderr.is_empty() {
+            tracing::error!(
+                "Error writing data to ruff stdin: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        return Err(anyhow!(e).context("Error writing data to ruff stdin"));
+    }
 
     Ok(output)
 }
