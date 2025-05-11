@@ -1543,6 +1543,7 @@ dependencies = [
  "sith_vendored",
  "ureq",
  "url",
+ "walkdir",
 ]
 
 [[package]]

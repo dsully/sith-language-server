@@ -1,8 +1,10 @@
 pub mod criterion;
 
 use std::fmt::{Display, Formatter};
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use walkdir::WalkDir;
 
 use url::Url;
 
@@ -178,3 +180,122 @@ impl Display for TestFileDownloadError {
 }
 
 impl std::error::Error for TestFileDownloadError {}
+
+const HOME_ASSISTANT_REPO_URL: &str = "https://github.com/home-assistant/core.git";
+const HOME_ASSISTANT_COMMIT: &str = "37328c78c142d430abd6a5dd2c07fe93a1142743";
+
+#[derive(Debug)]
+pub enum HomeAssistantRepoError {
+    GitError(String),
+    IoError(std::io::Error),
+    FileNotFound(PathBuf),
+    DownloadError(TestFileDownloadError),
+}
+
+impl From<std::io::Error> for HomeAssistantRepoError {
+    fn from(error: std::io::Error) -> Self {
+        Self::IoError(error)
+    }
+}
+
+impl From<TestFileDownloadError> for HomeAssistantRepoError {
+    fn from(error: TestFileDownloadError) -> Self {
+        Self::DownloadError(error)
+    }
+}
+
+impl std::fmt::Display for HomeAssistantRepoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GitError(msg) => write!(f, "Git error: {}", msg),
+            Self::IoError(err) => write!(f, "IO error: {}", err),
+            Self::FileNotFound(path) => write!(f, "File not found: {:?}", path),
+            Self::DownloadError(err) => write!(f, "Download error: {}", err),
+        }
+    }
+}
+
+impl std::error::Error for HomeAssistantRepoError {}
+
+/// Ensures Home Assistant repository is cloned and up to date
+pub fn ensure_home_assistant_repo() -> Result<PathBuf, HomeAssistantRepoError> {
+    let repo_path = TARGET_DIR.join("homeassistant");
+    if !repo_path.is_dir() {
+        std::fs::create_dir(&repo_path).expect("Failed to create directory!");
+        clone_repository(&repo_path)?;
+    }
+    Ok(repo_path)
+}
+
+fn clone_repository(repo_path: &Path) -> Result<(), HomeAssistantRepoError> {
+    let mut successs = Command::new("git")
+        .current_dir(repo_path)
+        .arg("init")
+        .status()
+        .map_err(|e| HomeAssistantRepoError::GitError(format!("Failed to init repository: {}", e)))?
+        .success();
+    if !successs {
+        return Err(HomeAssistantRepoError::GitError(
+            "Git 'init' command failed".to_string(),
+        ));
+    }
+    successs = Command::new("git")
+        .current_dir(repo_path)
+        .args(["remote", "add", "origin", HOME_ASSISTANT_REPO_URL])
+        .status()
+        .map_err(|e| {
+            HomeAssistantRepoError::GitError(format!("Failed to add repository origin: {}", e))
+        })?
+        .success();
+    if !successs {
+        return Err(HomeAssistantRepoError::GitError(
+            "Git 'remote add' command failed".to_string(),
+        ));
+    }
+    successs = Command::new("git")
+        .current_dir(repo_path)
+        .args(["fetch", "origin", HOME_ASSISTANT_COMMIT])
+        .status()
+        .map_err(|e| HomeAssistantRepoError::GitError(format!("Failed to fetch commit: {}", e)))?
+        .success();
+    if !successs {
+        return Err(HomeAssistantRepoError::GitError(
+            "Git 'fetch' command failed".to_string(),
+        ));
+    }
+    successs = Command::new("git")
+        .current_dir(repo_path)
+        .args(["reset", "--hard", HOME_ASSISTANT_COMMIT])
+        .status()
+        .map_err(|e| HomeAssistantRepoError::GitError(format!("Failed to reset commit: {}", e)))?
+        .success();
+
+    if !successs {
+        return Err(HomeAssistantRepoError::GitError(
+            "Git 'reset' command failed".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Find all Python files in the home assistant repository
+pub fn find_all_python_files() -> Result<Vec<PathBuf>, HomeAssistantRepoError> {
+    let repo_path = ensure_home_assistant_repo()?;
+    let mut python_files = Vec::new();
+
+    for entry in WalkDir::new(&repo_path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| !e.file_type().is_dir())
+    {
+        let path = entry.path();
+        if let Some(ext) = path.extension() {
+            if ext == "py" {
+                python_files.push(path.to_path_buf());
+            }
+        }
+    }
+
+    Ok(python_files)
+}

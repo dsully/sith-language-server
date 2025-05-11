@@ -22,12 +22,17 @@ harness = false
 name = "semantic_table_builder"
 harness = false
 
+[[bench]]
+name = "indexer"
+harness = false
+
 [dependencies]
 url = "2.5.0"
 ureq = "2.9.6"
 criterion = "0.5.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
+walkdir = { workspace = true }
 
 [dev-dependencies]
 sith_python_parser = { workspace = true }
